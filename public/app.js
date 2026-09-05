@@ -2599,6 +2599,72 @@ function diagramBuilderPiece(kind, paletteLabel) {
   return { kind, label: "", paletteLabel, lineIndex: null };
 }
 
+const DIAGRAM_BUILDER_TOOLTIPS = {
+  "class-box": "Beschreibt eine Klasse mit Attributen und Methoden.",
+  "class-abstract": "Basisklasse, die nicht direkt instanziiert wird.",
+  "class-interface": "Definiert einen Vertrag, den Klassen umsetzen.",
+  "class-enum": "Stellt eine feste Menge benannter Werte dar.",
+  "class-package": "Gruppiert fachlich zusammengehörige Modellelemente.",
+  "state-start": "Markiert den Eintritt in den Zustandsautomaten.",
+  state: "Beschreibt einen Zustand mit entry-, do- und exit-Verhalten.",
+  "state-choice": "Wählt abhängig von Bedingungen einen Übergang.",
+  "state-end": "Markiert das Ende des Zustandsautomaten.",
+  actor: "Externe Rolle, die mit dem System interagiert.",
+  usecase: "Beschreibt ein Ziel, das ein Akteur mit dem System erreicht.",
+  boundary: "Umschließt die Anwendungsfälle eines benannten Systems.",
+  "activity-start": "Startpunkt des dargestellten Ablaufs.",
+  "activity-action": "Ein einzelner ausführbarer Arbeitsschritt.",
+  "activity-object": "Zeigt Daten oder Objekte zwischen zwei Aktionen.",
+  "activity-pin": "Markiert Ein- oder Ausgabedaten; auf einen Pfeil ziehen.",
+  "activity-decision": "Verzweigt den Ablauf anhand einer Bedingung.",
+  "activity-merge": "Führt alternative Ablaufzweige wieder zusammen.",
+  "activity-fork": "Startet mehrere Ablaufzweige gleichzeitig.",
+  "activity-join": "Wartet und vereint parallele Ablaufzweige.",
+  "activity-send-signal": "Sendet ein Signal, ohne auf eine Antwort zu warten.",
+  "activity-accept-event": "Wartet, bis ein Ereignis oder Signal eintritt.",
+  "activity-flow-final": "Beendet nur den ankommenden Ablaufzweig.",
+  "activity-end": "Beendet die gesamte Aktivität.",
+  "activity-swimlane": "Ordnet Aktionen einer zuständigen Rolle oder Klasse zu.",
+  "sequence-actor": "Externe Rolle mit einer zeitlichen Lebenslinie.",
+  "sequence-object": "Teilnehmer, der Nachrichten sendet oder empfängt.",
+  "sequence-activation": "Zeigt, wie lange ein Teilnehmer aktiv arbeitet.",
+  "sequence-fragment": "Umschließt bedingte oder alternative Nachrichtenfolgen.",
+  "pap-start": "Kennzeichnet den Beginn des Programmablaufs.",
+  "pap-process": "Beschreibt eine Verarbeitung oder Berechnung.",
+  "pap-decision": "Teilt den Ablauf anhand einer Bedingung.",
+  "pap-decision-table": "Ordnet mehreren Bedingungen eindeutige Aktionen zu.",
+  "pap-input": "Kennzeichnet Daten, die das Programm einliest.",
+  "pap-output": "Kennzeichnet Daten, die das Programm ausgibt.",
+  "pap-end": "Kennzeichnet das Ende des Programmablaufs."
+};
+
+function positionDiagramBuilderPaletteTooltip(session, event) {
+  const tooltip = session.paletteTooltip;
+  if (!tooltip || tooltip.hidden) return;
+  const gap = 14;
+  const width = tooltip.offsetWidth;
+  const height = tooltip.offsetHeight;
+  const left = event.clientX + gap + width <= window.innerWidth - 8
+    ? event.clientX + gap
+    : event.clientX - width - gap;
+  const top = event.clientY + gap + height <= window.innerHeight - 8
+    ? event.clientY + gap
+    : event.clientY - height - gap;
+  tooltip.style.left = `${Math.max(8, left)}px`;
+  tooltip.style.top = `${Math.max(8, top)}px`;
+}
+
+function showDiagramBuilderPaletteTooltip(session, piece, event) {
+  if (!session.paletteTooltip) return;
+  session.paletteTooltip.textContent = DIAGRAM_BUILDER_TOOLTIPS[piece.kind] || "Diagrammelement im Raster platzieren.";
+  session.paletteTooltip.hidden = false;
+  positionDiagramBuilderPaletteTooltip(session, event);
+}
+
+function hideDiagramBuilderPaletteTooltip(session) {
+  if (session.paletteTooltip) session.paletteTooltip.hidden = true;
+}
+
 function diagramBuilderIsDiamond(piece) {
   return ["activity-decision", "activity-merge", "state-choice", "pap-decision"].includes(piece?.kind);
 }
@@ -4064,6 +4130,7 @@ function appendDiagramBuilderPieceContent(node, piece, labelText) {
 }
 
 function renderDiagramBuilderPalette(session) {
+  hideDiagramBuilderPaletteTooltip(session);
   session.paletteWrap.classList.remove("trash-active");
   session.palette.classList.remove("trash-mode");
   session.paletteLabel.textContent = "Baustein halten, ins Raster ziehen und dort loslassen.";
@@ -4075,13 +4142,17 @@ function renderDiagramBuilderPalette(session) {
       applyDiagramBuilderPieceMetrics(button, { ...piece, label: piece.paletteLabel });
     }
     appendDiagramBuilderPieceContent(button, piece, piece.paletteLabel);
-    button.title = piece.kind === "activity-pin"
-      ? "Pin halten und auf einen Pfeil ziehen"
-      : `${piece.paletteLabel} halten und ins Raster ziehen`;
     button.setAttribute("aria-label", piece.paletteLabel);
+    button.setAttribute("aria-describedby", "diagram-builder-palette-tooltip");
     button.setAttribute("aria-pressed", String(session.armedPieceIndex === index));
     if (session.armedPieceIndex === index) button.classList.add("placement-active");
-    button.addEventListener("pointerdown", (event) => beginDiagramBuilderPaletteDrag(session, index, button, event));
+    button.addEventListener("pointerenter", (event) => showDiagramBuilderPaletteTooltip(session, piece, event));
+    button.addEventListener("pointermove", (event) => positionDiagramBuilderPaletteTooltip(session, event));
+    button.addEventListener("pointerleave", () => hideDiagramBuilderPaletteTooltip(session));
+    button.addEventListener("pointerdown", (event) => {
+      hideDiagramBuilderPaletteTooltip(session);
+      beginDiagramBuilderPaletteDrag(session, index, button, event);
+    });
     session.palette.append(button);
   });
 }
@@ -6471,7 +6542,11 @@ function openDiagramBuilderMode(file) {
   toastDeleteButton.type = "button";
   toastActions.append(toastCancelButton, toastDeleteButton);
   toast.append(toastMessage, toastActions);
-  overlay.append(header, main, toast);
+  const paletteTooltip = createElement("div", "diagram-builder-palette-tooltip");
+  paletteTooltip.id = "diagram-builder-palette-tooltip";
+  paletteTooltip.setAttribute("role", "tooltip");
+  paletteTooltip.hidden = true;
+  overlay.append(header, main, toast, paletteTooltip);
   document.body.append(overlay);
   document.body.classList.add("diagram-builder-open");
 
@@ -6482,6 +6557,7 @@ function openDiagramBuilderMode(file) {
     palette,
     paletteWrap,
     paletteLabel: status,
+    paletteTooltip,
     canvasViewport,
     surface,
     emptyHint,
