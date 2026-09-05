@@ -2607,6 +2607,10 @@ function diagramBuilderIsSequenceParticipant(piece) {
   return ["sequence-actor", "sequence-object"].includes(piece?.kind);
 }
 
+function diagramBuilderIsClassifier(piece) {
+  return ["class-box", "class-interface", "class-enum"].includes(piece?.kind);
+}
+
 function createDiagramBuilderPieces(file, viewType = "activity") {
   const piecesByView = {
     class: [
@@ -2685,10 +2689,21 @@ function diagramBuilderPieceMetrics(piece) {
     const elementHeight = Math.max(96, 48 + behaviorTexts.length * 23);
     return { elementWidth, elementHeight, labelWidth: elementWidth - 28, visualWidth: elementWidth, visualHeight: elementHeight };
   }
+  if (diagramBuilderIsClassifier(piece)) {
+    const attributes = Array.isArray(piece.attributes) ? piece.attributes : [];
+    const methods = Array.isArray(piece.methods) ? piece.methods : [];
+    const literals = Array.isArray(piece.literals) ? piece.literals : [];
+    const rows = piece.kind === "class-enum" ? literals : [...attributes, ...methods];
+    const longestText = Math.max(0, text.length, ...rows.map((value) => String(value).length));
+    const elementWidth = Math.min(380, Math.max(180, longestText * 6 + 46));
+    const headerHeight = piece.kind === "class-box" ? 38 : 50;
+    const sectionHeight = (values) => Math.max(28, values.length * 20 + 12);
+    const elementHeight = piece.kind === "class-enum"
+      ? headerHeight + sectionHeight(literals)
+      : headerHeight + sectionHeight(attributes) + sectionHeight(methods);
+    return { elementWidth, elementHeight, labelWidth: elementWidth - 28, visualWidth: elementWidth, visualHeight: elementHeight };
+  }
   const fixedMetrics = {
-    "class-box": [180, 112],
-    "class-interface": [180, 112],
-    "class-enum": [180, 112],
     "class-package": [170, 90],
     actor: [80, 90],
     usecase: [180, 76],
@@ -2953,6 +2968,10 @@ function beginDiagramBuilderLabelEdit(session, placement) {
     beginDiagramBuilderStateEdit(session, placement, node);
     return;
   }
+  if (diagramBuilderIsClassifier(placement.piece)) {
+    beginDiagramBuilderClassifierEdit(session, placement, node);
+    return;
+  }
   const label = node?.querySelector(".diagram-builder-piece-label");
   if (!node || !label) return;
 
@@ -2980,6 +2999,109 @@ function beginDiagramBuilderLabelEdit(session, placement) {
   editor.addEventListener("blur", () => session.finishEditing?.(true));
   editor.focus();
   editor.select();
+}
+
+function createDiagramBuilderClassifierSectionEditor(title, values, inputLabel) {
+  const section = createElement("section", "diagram-builder-classifier-editor-section");
+  const header = createElement("div", "diagram-builder-classifier-editor-section-header");
+  header.append(createElement("strong", "", title));
+  const addButton = createElement("button", "diagram-builder-classifier-add", "+");
+  addButton.type = "button";
+  addButton.setAttribute("aria-label", `${inputLabel} hinzufügen`);
+  addButton.title = `${inputLabel} hinzufügen`;
+  header.append(addButton);
+  const rows = createElement("div", "diagram-builder-classifier-editor-rows");
+  const appendRow = (value = "") => {
+    const row = createElement("div", "diagram-builder-classifier-editor-row");
+    const input = createElement("input", "diagram-builder-classifier-row-input");
+    input.type = "text";
+    input.value = value;
+    input.placeholder = inputLabel;
+    input.setAttribute("aria-label", inputLabel);
+    const deleteButton = createElement("button", "diagram-builder-classifier-remove", "×");
+    deleteButton.type = "button";
+    deleteButton.setAttribute("aria-label", `${inputLabel} löschen`);
+    deleteButton.title = `${inputLabel} löschen`;
+    deleteButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      row.remove();
+      rows.querySelector("input")?.focus({ preventScroll: true });
+    });
+    row.append(input, deleteButton);
+    rows.append(row);
+    input.focus({ preventScroll: true });
+  };
+  (values.length ? values : [""]).forEach((value) => appendRow(value));
+  addButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    appendRow();
+  });
+  section.append(header, rows);
+  return {
+    section,
+    values: () => Array.from(rows.querySelectorAll("input"), (input) => input.value.trim()).filter(Boolean)
+  };
+}
+
+function beginDiagramBuilderClassifierEdit(session, placement, node) {
+  if (!node) return;
+  const piece = placement.piece;
+  const original = {
+    label: piece.label || "",
+    attributes: [...(piece.attributes || [])],
+    methods: [...(piece.methods || [])],
+    literals: [...(piece.literals || [])]
+  };
+  const editor = createElement("div", "diagram-builder-classifier-editor");
+  const nameInput = createElement("input", "diagram-builder-classifier-name-input");
+  nameInput.type = "text";
+  nameInput.value = original.label;
+  nameInput.placeholder = piece.kind === "class-interface" ? "Interfacename" : piece.kind === "class-enum" ? "Enumerationsname" : "Klassenname";
+  nameInput.setAttribute("aria-label", nameInput.placeholder);
+  editor.append(nameInput);
+
+  const sections = {};
+  if (piece.kind === "class-enum") {
+    sections.literals = createDiagramBuilderClassifierSectionEditor("Konstanten", original.literals, "Konstante");
+    editor.append(sections.literals.section);
+  } else {
+    sections.attributes = createDiagramBuilderClassifierSectionEditor("Attribute", original.attributes, "Attribut");
+    sections.methods = createDiagramBuilderClassifierSectionEditor("Methoden", original.methods, "Methode");
+    editor.append(sections.attributes.section, sections.methods.section);
+  }
+
+  node.replaceChildren(editor);
+  node.classList.add("editing", "classifier-editing");
+  session.editingPlacementId = placement.id;
+  let finished = false;
+  session.finishEditing = (save) => {
+    if (finished) return;
+    finished = true;
+    if (save) {
+      piece.label = nameInput.value.trim();
+      if (piece.kind === "class-enum") piece.literals = sections.literals.values();
+      else {
+        piece.attributes = sections.attributes.values();
+        piece.methods = sections.methods.values();
+      }
+    } else Object.assign(piece, original);
+    session.editingPlacementId = null;
+    session.finishEditing = null;
+    renderDiagramBuilderWorkspace(session);
+    setDiagramBuilderStatus(session, save ? "Klassifizierer übernommen." : "Bearbeitung abgebrochen.", save ? "success" : "");
+  };
+  editor.addEventListener("click", (event) => event.stopPropagation());
+  editor.addEventListener("dblclick", (event) => event.stopPropagation());
+  editor.addEventListener("contextmenu", (event) => event.stopPropagation());
+  editor.addEventListener("focusout", () => {
+    window.setTimeout(() => {
+      if (!editor.contains(document.activeElement)) session.finishEditing?.(true);
+    }, 0);
+  });
+  nameInput.focus();
+  nameInput.select();
 }
 
 function beginDiagramBuilderSequenceParticipantEdit(session, placement, node) {
@@ -3132,6 +3254,22 @@ function appendDiagramBuilderActorContent(node, labelText) {
   node.append(figure, createElement("span", "diagram-builder-piece-label", labelText || ""));
 }
 
+function appendDiagramBuilderClassifierContent(node, piece, labelText) {
+  const content = createElement("div", "diagram-builder-classifier-content");
+  content.append(createElement("div", "diagram-builder-classifier-name", labelText || ""));
+  const appendSection = (values, className) => {
+    const section = createElement("div", `diagram-builder-classifier-section ${className}`);
+    (values || []).forEach((value) => section.append(createElement("div", "diagram-builder-classifier-row", value)));
+    content.append(section);
+  };
+  if (piece.kind === "class-enum") appendSection(piece.literals, "literals");
+  else {
+    appendSection(piece.attributes, "attributes");
+    appendSection(piece.methods, "methods");
+  }
+  node.append(content);
+}
+
 function appendDiagramBuilderPieceContent(node, piece, labelText) {
   if (["actor", "sequence-actor"].includes(piece.kind)) {
     appendDiagramBuilderActorContent(node, labelText);
@@ -3139,6 +3277,10 @@ function appendDiagramBuilderPieceContent(node, piece, labelText) {
   }
   if (piece.kind === "state") {
     appendDiagramBuilderStateContent(node, piece);
+    return;
+  }
+  if (diagramBuilderIsClassifier(piece)) {
+    appendDiagramBuilderClassifierContent(node, piece, labelText);
     return;
   }
   node.append(createElement("span", "diagram-builder-piece-label", labelText || ""));
