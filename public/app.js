@@ -2600,7 +2600,7 @@ function diagramBuilderPiece(kind, paletteLabel) {
 }
 
 function diagramBuilderIsDiamond(piece) {
-  return ["activity-decision", "state-choice", "pap-decision"].includes(piece?.kind);
+  return ["activity-decision", "activity-merge", "state-choice", "pap-decision"].includes(piece?.kind);
 }
 
 function diagramBuilderIsSequenceParticipant(piece) {
@@ -2634,8 +2634,15 @@ function createDiagramBuilderPieces(file, viewType = "activity") {
     activity: [
       diagramBuilderPiece("activity-start", "Start"),
       diagramBuilderPiece("activity-action", "Aktion"),
+      diagramBuilderPiece("activity-object", "Objektknoten"),
       diagramBuilderPiece("activity-decision", "Entscheidung"),
-      diagramBuilderPiece("activity-end", "Ende"),
+      diagramBuilderPiece("activity-merge", "Zusammenführung"),
+      diagramBuilderPiece("activity-fork", "Fork"),
+      diagramBuilderPiece("activity-join", "Join"),
+      diagramBuilderPiece("activity-send-signal", "Signal senden"),
+      diagramBuilderPiece("activity-accept-event", "Ereignis annehmen"),
+      diagramBuilderPiece("activity-flow-final", "Flussende"),
+      diagramBuilderPiece("activity-end", "Aktivitätsende"),
       diagramBuilderPiece("activity-swimlane", "Swimlane")
     ],
     sequence: [
@@ -2704,7 +2711,7 @@ function diagramBuilderPieceMetrics(piece) {
     const labelWidth = text ? Math.max(70, labelCharacters * 6 + 18) : 28;
     return { elementWidth: 28, elementHeight: 28, labelWidth, visualWidth: labelWidth, visualHeight: text ? 38 + lineCount * 14 : 28 };
   }
-  if (["activity-decision", "state-choice", "pap-decision"].includes(piece.kind)) {
+  if (["activity-decision", "activity-merge", "state-choice", "pap-decision"].includes(piece.kind)) {
     const charactersPerLine = 22;
     const lineCount = Math.max(1, logicalLines.reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / charactersPerLine)), 0));
     const labelCharacters = Math.min(charactersPerLine, Math.max(1, ...logicalLines.map((line) => line.length)));
@@ -2753,6 +2760,12 @@ function diagramBuilderPieceMetrics(piece) {
   }
   const fixedMetrics = {
     "class-package": [170, 90],
+    "activity-fork": [112, 12],
+    "activity-join": [112, 12],
+    "activity-flow-final": [30, 30],
+    "activity-object": [140, 54],
+    "activity-send-signal": [124, 58],
+    "activity-accept-event": [124, 58],
     actor: [80, 90],
     usecase: [180, 76],
     boundary: [330, 240],
@@ -4467,27 +4480,52 @@ function beginDiagramBuilderConnectionLabelEdit(session, connection, clientX, cl
     label: connection.label || "",
     startMarker: connection.startMarker || "none",
     endMarker: connection.endMarker || "control",
+    lineType: connection.lineType || "",
     sourceId: connection.sourceId,
     targetId: connection.targetId
   };
-  const editor = createElement("input", "diagram-builder-connection-label-editor");
-  editor.type = "text";
-  editor.value = connection.label || "";
-  editor.placeholder = "Pfeiltext eingeben";
-  editor.setAttribute("aria-label", "Beschriftung des Pfeils bearbeiten");
+  const editor = createElement("div", "diagram-builder-connection-label-editor");
   editor.style.left = `${Math.max(90, Math.min(window.innerWidth - 90, clientX))}px`;
   editor.style.top = `${Math.max(28, Math.min(window.innerHeight - 28, clientY))}px`;
+  let lineType = null;
+  if (session.viewType === "sequence") {
+    lineType = createElement("select", "diagram-builder-connection-type-select");
+    lineType.setAttribute("aria-label", "Nachrichtentyp wählen");
+    lineType.append(
+      new Option("Synchroner Aufruf", "sequence-sync", false, (connection.lineType || "sequence-sync") === "sequence-sync"),
+      new Option("Asynchrone Nachricht", "sequence-async", false, connection.lineType === "sequence-async"),
+      new Option("Antwort", "sequence-reply", false, connection.lineType === "sequence-reply")
+    );
+  } else if (session.viewType === "class") {
+    lineType = createElement("select", "diagram-builder-connection-type-select");
+    lineType.setAttribute("aria-label", "Beziehungsart wählen");
+    lineType.append(
+      new Option("Beziehung (durchgezogen)", "class-relation", false, (connection.lineType || "class-relation") === "class-relation"),
+      new Option("Abhängigkeit (gestrichelt)", "class-dependency", false, connection.lineType === "class-dependency")
+    );
+  }
+  const labelInput = createElement("input", "diagram-builder-connection-text-input");
+  labelInput.type = "text";
+  labelInput.value = connection.label || "";
+  labelInput.placeholder = "Pfeiltext eingeben";
+  labelInput.setAttribute("aria-label", "Beschriftung des Pfeils bearbeiten");
+  if (lineType) editor.append(lineType);
+  editor.append(labelInput);
   session.overlay.append(editor);
   session.editingConnectionId = connection.id;
   let finished = false;
   session.finishConnectionEditing = (save) => {
     if (finished) return;
     finished = true;
-    if (save) connection.label = editor.value.trim();
+    if (save) {
+      connection.label = labelInput.value.trim();
+      if (lineType) connection.lineType = lineType.value;
+    }
     else {
       connection.label = original.label;
       connection.startMarker = original.startMarker;
       connection.endMarker = original.endMarker;
+      connection.lineType = original.lineType;
       connection.sourceId = original.sourceId;
       connection.targetId = original.targetId;
     }
@@ -4498,15 +4536,20 @@ function beginDiagramBuilderConnectionLabelEdit(session, connection, clientX, cl
     drawDiagramBuilderConnections(session);
     setDiagramBuilderStatus(session, save ? "Pfeilbeschriftung übernommen." : "Pfeilbearbeitung abgebrochen.", save ? "success" : "");
   };
-  editor.addEventListener("blur", () => {
+  editor.addEventListener("focusout", () => {
     window.setTimeout(() => {
       const focused = document.activeElement;
       if (focused?.closest?.(".diagram-builder-endpoint-control, .diagram-builder-endpoint-menu")) return;
-      session.finishConnectionEditing?.(true);
+      if (!editor.contains(focused)) session.finishConnectionEditing?.(true);
     }, 0);
   });
-  editor.focus();
-  editor.select();
+  lineType?.addEventListener("change", () => {
+    connection.lineType = lineType.value;
+    drawDiagramBuilderConnections(session);
+    lineType.focus({ preventScroll: true });
+  });
+  labelInput.focus();
+  labelInput.select();
   drawDiagramBuilderConnections(session);
 }
 
@@ -4553,7 +4596,9 @@ function openDiagramBuilderEndpointMenu(session, connection, endpoint, clientX, 
 
 function renderDiagramBuilderEndpointControls(session, connection, route, surfaceRect) {
   if (session.editingConnectionId !== connection.id) return;
-  const fixedUseCaseDependency = diagramBuilderIsUseCaseDependency(session, connection);
+  const fixedConnectionStyle = diagramBuilderIsUseCaseDependency(session, connection)
+    || session.viewType === "sequence"
+    || connection.lineType === "class-dependency";
   const endpoints = [
     ["start", route.points[0]],
     ["end", route.points[route.points.length - 1]]
@@ -4565,7 +4610,7 @@ function renderDiagramBuilderEndpointControls(session, connection, route, surfac
     control.type = "button";
     control.style.left = `${surfaceRect.left + point.x * zoom}px`;
     control.style.top = `${surfaceRect.top + point.y * zoom}px`;
-    control.title = fixedUseCaseDependency
+    control.title = fixedConnectionStyle
       ? `${endpoint === "start" ? "Pfeilanfang" : "Pfeilende"} verschieben`
       : `${endpoint === "start" ? "Pfeilanfang" : "Pfeilende"} verschieben oder Pfeilspitze wählen`;
     control.setAttribute("aria-label", control.title);
@@ -4613,7 +4658,7 @@ function renderDiagramBuilderEndpointControls(session, connection, route, surfac
         setDiagramBuilderStatus(session, `${endpoint === "start" ? "Pfeilanfang" : "Pfeilende"} wurde neu verbunden.`, "success");
       }
       drawDiagramBuilderConnections(session);
-      session.overlay.querySelector(".diagram-builder-connection-label-editor, .diagram-builder-usecase-relation-input")?.focus({ preventScroll: true });
+      session.overlay.querySelector(".diagram-builder-connection-text-input, .diagram-builder-usecase-relation-input")?.focus({ preventScroll: true });
       window.setTimeout(() => { suppressClick = false; }, 0);
     };
     const cancelEndpoint = (event) => finishEndpoint(event, true);
@@ -4633,7 +4678,7 @@ function renderDiagramBuilderEndpointControls(session, connection, route, surfac
       event.preventDefault();
       event.stopPropagation();
       if (suppressClick) return;
-      if (fixedUseCaseDependency) return;
+      if (fixedConnectionStyle) return;
       openDiagramBuilderEndpointMenu(session, connection, endpoint, event.clientX, event.clientY);
     });
     session.overlay.append(control);
@@ -4648,7 +4693,8 @@ function startDiagramBuilderConnectionFromHandle(session, placement) {
     type: "editable",
     label: "",
     startMarker: "none",
-    endMarker: "control"
+    endMarker: "control",
+    lineType: session.viewType === "sequence" ? "sequence-sync" : session.viewType === "class" ? "class-relation" : ""
   };
   session.surface.classList.add("connecting");
   session.surface.querySelector(`[data-placement-id="${placement.id}"] .diagram-builder-piece`)?.classList.add("connection-source");
@@ -4919,8 +4965,9 @@ function drawDiagramBuilderConnections(session) {
     const pathData = route.points
       .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
       .join(" ");
+    const lineType = connection.lineType || (session.viewType === "sequence" ? "sequence-sync" : session.viewType === "class" ? "class-relation" : "");
     const pathAttributes = {
-      class: `diagram-builder-connector editable${isUseCaseDependency ? " usecase-dependency" : ""}`,
+      class: `diagram-builder-connector editable${isUseCaseDependency ? " usecase-dependency" : ""}${lineType ? ` ${lineType}` : ""}`,
       d: pathData
     };
     const markerUrl = (markerType) => ({
@@ -4931,9 +4978,14 @@ function drawDiagramBuilderConnections(session) {
       aggregation: "url(#diagram-builder-aggregation)",
       composition: "url(#diagram-builder-composition)"
     })[markerType];
-    const startMarkerUrl = isUseCaseDependency ? null : markerUrl(connection.startMarker || "none");
+    const fixedSemanticLine = session.viewType === "sequence" || lineType === "class-dependency";
+    const startMarkerUrl = isUseCaseDependency || fixedSemanticLine ? null : markerUrl(connection.startMarker || "none");
     const endMarkerUrl = isUseCaseDependency
       ? "url(#diagram-builder-activity-arrowhead)"
+      : session.viewType === "sequence"
+        ? lineType === "sequence-sync" ? "url(#diagram-builder-arrowhead)" : "url(#diagram-builder-activity-arrowhead)"
+      : lineType === "class-dependency"
+        ? "url(#diagram-builder-activity-arrowhead)"
       : markerUrl(connection.endMarker || "control");
     if (startMarkerUrl) pathAttributes["marker-start"] = startMarkerUrl;
     if (endMarkerUrl) pathAttributes["marker-end"] = endMarkerUrl;
@@ -5012,6 +5064,7 @@ function createDiagramBuilderPlacedNode(session, placement) {
         label: session.pendingConnection.label,
         startMarker: session.pendingConnection.startMarker,
         endMarker: session.pendingConnection.endMarker,
+        lineType: session.pendingConnection.lineType || "",
         ...(isUseCaseDependency ? { useCaseRelation: "include" } : {})
       });
       clearDiagramBuilderConnectionMode(session);
