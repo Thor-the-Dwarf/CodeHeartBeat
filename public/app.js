@@ -2805,11 +2805,15 @@ function updateDiagramBuilderGridMetrics(session) {
   );
   const maximumRow = Math.max(
     0,
-    ...session.placements.map((placement) => placement.row + diagramBuilderPlacementSpan(session, placement.piece).rows - 1),
+    ...session.placements.map((placement) => placement.row + (
+      placement.piece.kind === "sequence-activation"
+        ? Math.max(1, Number(placement.piece.activationRows) || 1)
+        : diagramBuilderPlacementSpan(session, placement.piece).rows
+    ) - 1),
     ...session.systemBoundaries.map((boundary) => boundary.bottomRow - 1),
     ...session.placements
       .filter((placement) => diagramBuilderIsSequenceParticipant(placement.piece))
-      .map((placement) => placement.row + Math.max(1, Number(placement.piece.lifelineRows) || 5))
+      .map((placement) => placement.row + Math.max(1, Number(placement.piece.lifelineRows) || 1))
   );
   session.surface.style.setProperty("--builder-cell-width", `${session.cellWidth}px`);
   session.surface.style.setProperty("--builder-cell-height", `${session.cellHeight}px`);
@@ -2832,10 +2836,13 @@ function diagramBuilderPlacementAt(session, row, column, ignoredId = null) {
   return session.placements.find((placement) => {
     if (placement.id === ignoredId) return false;
     const span = diagramBuilderPlacementSpan(session, placement.piece);
+    const occupiedRows = placement.piece.kind === "sequence-activation"
+      ? Math.max(1, Number(placement.piece.activationRows) || 1)
+      : span.rows;
     return column >= placement.column
       && column < placement.column + span.columns
       && row >= placement.row
-      && row < placement.row + span.rows;
+      && row < placement.row + occupiedRows;
   });
 }
 
@@ -2844,35 +2851,65 @@ function diagramBuilderPlacementOverlaps(session, piece, row, column, ignoredId 
   return session.placements.some((placement) => {
     if (placement.id === ignoredId) return false;
     const placedSpan = diagramBuilderPlacementSpan(session, placement.piece);
+    const candidateRows = piece.kind === "sequence-activation"
+      ? Math.max(1, Number(piece.activationRows) || 1)
+      : candidateSpan.rows;
+    const placedRows = placement.piece.kind === "sequence-activation"
+      ? Math.max(1, Number(placement.piece.activationRows) || 1)
+      : placedSpan.rows;
     return column < placement.column + placedSpan.columns
       && column + candidateSpan.columns > placement.column
-      && row < placement.row + placedSpan.rows
-      && row + candidateSpan.rows > placement.row;
+      && row < placement.row + placedRows
+      && row + candidateRows > placement.row;
   });
 }
 
 function diagramBuilderLifelineCoversCell(participant, row, column) {
   if (!participant || !diagramBuilderIsSequenceParticipant(participant.piece)) return false;
-  const length = Math.max(1, Number(participant.piece.lifelineRows) || 5);
+  const length = Math.max(1, Number(participant.piece.lifelineRows) || 1);
   return participant.column === column && row > participant.row && row <= participant.row + length;
 }
 
-function diagramBuilderActivationHasLifeline(session, row, column, participantOverride = null) {
+function diagramBuilderActivationHasLifeline(session, row, column, participantOverride = null, activationRows = 1) {
+  const lastRow = row + Math.max(1, Number(activationRows) || 1) - 1;
   return session.placements.some((placement) => {
     const participant = participantOverride?.id === placement.id ? participantOverride : placement;
-    return diagramBuilderLifelineCoversCell(participant, row, column);
+    return diagramBuilderLifelineCoversCell(participant, row, column)
+      && diagramBuilderLifelineCoversCell(participant, lastRow, column);
   });
+}
+
+function diagramBuilderCanResizeActivation(session, placement, row, activationRows) {
+  const rows = Math.max(1, Number(activationRows) || 1);
+  if (!diagramBuilderActivationHasLifeline(session, row, placement.column, null, rows)) return false;
+  for (let currentRow = row; currentRow < row + rows; currentRow += 1) {
+    if (diagramBuilderPlacementAt(session, currentRow, placement.column, placement.id)) return false;
+  }
+  return true;
 }
 
 function diagramBuilderCanPlacePiece(session, piece, row, column, ignoredId = null) {
   if (piece.kind === "boundary") return true;
   if (diagramBuilderPlacementOverlaps(session, piece, row, column, ignoredId)) return false;
-  if (piece.kind === "sequence-activation") return diagramBuilderActivationHasLifeline(session, row, column);
+  if (piece.kind === "sequence-activation") {
+    const rows = Math.max(1, Number(piece.activationRows) || 1);
+    if (!diagramBuilderActivationHasLifeline(session, row, column, null, rows)) return false;
+    for (let currentRow = row; currentRow < row + rows; currentRow += 1) {
+      if (diagramBuilderPlacementAt(session, currentRow, column, ignoredId)) return false;
+    }
+    return true;
+  }
   if (!diagramBuilderIsSequenceParticipant(piece) || !ignoredId) return true;
   const override = { id: ignoredId, piece, row, column };
   return session.placements
     .filter((placement) => placement.piece.kind === "sequence-activation")
-    .every((activation) => diagramBuilderActivationHasLifeline(session, activation.row, activation.column, override));
+    .every((activation) => diagramBuilderActivationHasLifeline(
+      session,
+      activation.row,
+      activation.column,
+      override,
+      activation.piece.activationRows
+    ));
 }
 
 function setDiagramBuilderStatus(session, message, state = "") {
@@ -3038,6 +3075,10 @@ function beginDiagramBuilderLabelEdit(session, placement) {
   const node = session.surface.querySelector(`[data-placement-id="${placement.id}"] .diagram-builder-piece`);
   if (diagramBuilderIsSequenceParticipant(placement.piece)) {
     beginDiagramBuilderSequenceParticipantEdit(session, placement, node);
+    return;
+  }
+  if (placement.piece.kind === "sequence-activation") {
+    beginDiagramBuilderSequenceActivationEdit(session, placement, node);
     return;
   }
   if (placement.piece.kind === "state") {
@@ -3445,69 +3486,246 @@ function beginDiagramBuilderClassifierEdit(session, placement, node) {
   nameInput.select();
 }
 
-function beginDiagramBuilderSequenceParticipantEdit(session, placement, node) {
-  const label = node?.querySelector(".diagram-builder-piece-label");
-  if (!node || !label) return;
-  const originalLabel = placement.piece.label || "";
-  const originalRows = Math.max(1, Number(placement.piece.lifelineRows) || 5);
-  const originalEndX = Boolean(placement.piece.lifelineEndX);
-  const minimumRows = Math.max(1, ...session.placements
+function diagramBuilderMinimumLifelineRows(session, placement) {
+  return Math.max(1, ...session.placements
     .filter((item) => item.piece.kind === "sequence-activation"
       && item.column === placement.column
       && item.row > placement.row
       && diagramBuilderLifelineCoversCell(placement, item.row, item.column)
       && !session.placements.some((candidate) => candidate.id !== placement.id && diagramBuilderLifelineCoversCell(candidate, item.row, item.column)))
-    .map((item) => item.row - placement.row));
+    .map((item) => item.row - placement.row + Math.max(1, Number(item.piece.activationRows) || 1) - 1));
+}
+
+function beginDiagramBuilderSequenceParticipantEdit(session, placement, node) {
+  const label = node?.querySelector(".diagram-builder-piece-label");
+  if (!node || !label) return;
+  const originalLabel = placement.piece.label || "";
+  const originalRows = Math.max(1, Number(placement.piece.lifelineRows) || 1);
+  const originalEndX = Boolean(placement.piece.lifelineEndX);
+  const minimumRows = diagramBuilderMinimumLifelineRows(session, placement);
   const editor = createElement("div", "diagram-builder-sequence-participant-editor");
   const nameInput = createElement("input", "diagram-builder-sequence-participant-name");
   nameInput.type = "text";
   nameInput.value = originalLabel;
   nameInput.placeholder = "Name";
   nameInput.setAttribute("aria-label", "Name des Teilnehmers bearbeiten");
-  const lengthLabel = createElement("label", "diagram-builder-sequence-editor-row");
-  lengthLabel.append(createElement("span", "", "Lifeline"));
-  const lengthInput = createElement("input", "diagram-builder-sequence-length-input");
-  lengthInput.type = "number";
-  lengthInput.min = String(minimumRows);
-  lengthInput.max = "40";
-  lengthInput.step = "1";
-  lengthInput.value = String(Math.max(minimumRows, originalRows));
-  lengthInput.setAttribute("aria-label", "Länge der Lifeline in Rasterfeldern");
-  lengthLabel.append(lengthInput);
-  const endLabel = createElement("label", "diagram-builder-sequence-editor-row checkbox");
-  const endInput = document.createElement("input");
-  endInput.type = "checkbox";
-  endInput.checked = originalEndX;
-  endInput.setAttribute("aria-label", "X am Ende der Lifeline anzeigen");
-  endLabel.append(endInput, createElement("span", "", "X am Ende"));
-  editor.append(nameInput, lengthLabel, endLabel);
+  editor.append(nameInput, createElement("span", "diagram-builder-sequence-editor-hint", "Unteren Griff ziehen · anklicken für Abschluss"));
   label.replaceWith(editor);
   node.classList.add("editing", "sequence-participant-editing");
   session.editingPlacementId = placement.id;
+  placement.piece.lifelineRows = Math.max(minimumRows, originalRows);
+  renderDiagramBuilderLifelineEditControl(session, placement, minimumRows);
   let finished = false;
   session.finishEditing = (save) => {
     if (finished) return;
     finished = true;
     placement.piece.label = save ? nameInput.value.trim() : originalLabel;
-    placement.piece.lifelineRows = save
-      ? Math.min(40, Math.max(minimumRows, Number.parseInt(lengthInput.value, 10) || originalRows))
-      : originalRows;
-    placement.piece.lifelineEndX = save ? endInput.checked : originalEndX;
+    if (!save) {
+      placement.piece.lifelineRows = originalRows;
+      placement.piece.lifelineEndX = originalEndX;
+    }
+    session.overlay.querySelector(".diagram-builder-lifeline-end-menu")?.remove();
     session.editingPlacementId = null;
     session.finishEditing = null;
     renderDiagramBuilderWorkspace(session);
-    setDiagramBuilderStatus(session, save ? "Lifeline übernommen." : "Bearbeitung abgebrochen.", save ? "success" : "");
+    setDiagramBuilderStatus(session, save ? "Lebenslinie übernommen." : "Bearbeitung abgebrochen.", save ? "success" : "");
   };
   editor.addEventListener("click", (event) => event.stopPropagation());
   editor.addEventListener("dblclick", (event) => event.stopPropagation());
   editor.addEventListener("contextmenu", (event) => event.stopPropagation());
   editor.addEventListener("focusout", () => {
     window.setTimeout(() => {
+      if (document.activeElement?.closest?.(".diagram-builder-lifeline-end-control, .diagram-builder-lifeline-end-menu")) return;
       if (!editor.contains(document.activeElement)) session.finishEditing?.(true);
     }, 0);
   });
   nameInput.focus();
   nameInput.select();
+}
+
+function openDiagramBuilderLifelineEndMenu(session, placement, control) {
+  session.overlay.querySelector(".diagram-builder-lifeline-end-menu")?.remove();
+  const menu = createElement("div", "diagram-builder-endpoint-menu diagram-builder-lifeline-end-menu");
+  menu.setAttribute("aria-label", "Abschluss der Lebenslinie wählen");
+  const rect = control.getBoundingClientRect();
+  menu.style.left = `${Math.max(118, Math.min(window.innerWidth - 118, rect.left + rect.width / 2))}px`;
+  menu.style.top = `${Math.max(8, Math.min(window.innerHeight - 132, rect.bottom))}px`;
+  [[false, "Ohne Abschluss", "lifeline-open"], [true, "Zerstörung", "lifeline-destruction"]].forEach(([hasX, label, preview]) => {
+    const button = createElement("button", placement.piece.lifelineEndX === hasX ? "selected" : "");
+    button.type = "button";
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.append(
+      createElement("span", `diagram-builder-marker-preview ${preview}`),
+      createElement("span", "diagram-builder-marker-label", label)
+    );
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      placement.piece.lifelineEndX = hasX;
+      menu.remove();
+      renderDiagramBuilderLifelineEditControl(session, placement, diagramBuilderMinimumLifelineRows(session, placement));
+      session.surface.querySelector(`[data-placement-id="${placement.id}"] .diagram-builder-sequence-participant-name`)?.focus({ preventScroll: true });
+    });
+    menu.append(button);
+  });
+  session.overlay.append(menu);
+  menu.querySelector("button.selected, button")?.focus({ preventScroll: true });
+}
+
+function renderDiagramBuilderLifelineEditControl(session, placement, minimumRows = 1) {
+  const lifeline = session.surface.querySelector(`[data-participant-id="${placement.id}"]`);
+  if (!lifeline) return;
+  lifeline.classList.add("editing");
+  lifeline.querySelector(".diagram-builder-lifeline-end-control")?.remove();
+  const control = createElement("button", `diagram-builder-lifeline-end-control${placement.piece.lifelineEndX ? " has-destruction" : ""}`);
+  control.type = "button";
+  control.title = "Ziehen, um die Länge zu ändern · anklicken, um den Abschluss zu wählen";
+  control.setAttribute("aria-label", control.title);
+  let drag = null;
+  let suppressClick = false;
+  const move = (event) => {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    if (!drag.active && Math.abs(event.clientY - drag.startY) < 6) return;
+    event.preventDefault();
+    drag.active = true;
+    suppressClick = true;
+    control.classList.add("dragging");
+    const surfaceRect = session.surface.getBoundingClientRect();
+    const targetY = (event.clientY - surfaceRect.top) / (session.gridZoom || 1);
+    const metrics = diagramBuilderPieceMetrics(placement.piece);
+    const startY = (placement.row + 0.5) * session.cellHeight + metrics.elementHeight / 2;
+    const requestedRows = Math.round((targetY - startY) / session.cellHeight);
+    placement.piece.lifelineRows = Math.min(40, Math.max(minimumRows, requestedRows));
+    applyDiagramBuilderLifelineGeometry(session, placement, lifeline);
+    setDiagramBuilderStatus(session, `Lebenslinie: ${placement.piece.lifelineRows} Rasterfeld${placement.piece.lifelineRows === 1 ? "" : "er"}.`, "success");
+  };
+  const finish = (event) => {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const wasActive = drag.active;
+    drag = null;
+    control.classList.remove("dragging");
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", finish);
+    window.removeEventListener("pointercancel", finish);
+    if (wasActive) window.setTimeout(() => { suppressClick = false; }, 0);
+  };
+  control.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    drag = { pointerId: event.pointerId, startY: event.clientY, active: false };
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
+  });
+  control.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (suppressClick) return;
+    openDiagramBuilderLifelineEndMenu(session, placement, control);
+  });
+  lifeline.append(control);
+}
+
+function diagramBuilderActivationHeight(session, piece) {
+  return Math.max(24, Math.max(1, Number(piece.activationRows) || 1) * session.cellHeight - 28);
+}
+
+function applyDiagramBuilderActivationGeometry(session, placement, cell, node) {
+  cell.style.top = `${placement.row * session.cellHeight}px`;
+  node.style.setProperty("--builder-activation-height", `${diagramBuilderActivationHeight(session, placement.piece)}px`);
+}
+
+function beginDiagramBuilderSequenceActivationEdit(session, placement, node) {
+  if (!node) return;
+  const cell = node.closest(".diagram-builder-cell-item");
+  if (!cell) return;
+  const original = {
+    row: placement.row,
+    activationRows: Math.max(1, Number(placement.piece.activationRows) || 1)
+  };
+  placement.piece.activationRows = original.activationRows;
+  node.replaceChildren();
+  node.classList.add("editing", "sequence-activation-editing");
+  cell.querySelector(".diagram-builder-connection-handles")?.remove();
+  session.editingPlacementId = placement.id;
+
+  const topHandle = createElement("button", "diagram-builder-activation-resize-handle top");
+  const bottomHandle = createElement("button", "diagram-builder-activation-resize-handle bottom");
+  topHandle.type = "button";
+  bottomHandle.type = "button";
+  topHandle.title = "Oberen Rand ziehen";
+  bottomHandle.title = "Unteren Rand ziehen";
+  topHandle.setAttribute("aria-label", "Beginn des Aktivitätsbalkens ziehen");
+  bottomHandle.setAttribute("aria-label", "Ende des Aktivitätsbalkens ziehen");
+
+  const attachResize = (handle, edge) => {
+    let pointerId = null;
+    const move = (event) => {
+      if (event.pointerId !== pointerId) return;
+      event.preventDefault();
+      const surfaceRect = session.surface.getBoundingClientRect();
+      const targetY = (event.clientY - surfaceRect.top) / (session.gridZoom || 1);
+      const currentEnd = placement.row + Math.max(1, Number(placement.piece.activationRows) || 1);
+      let nextRow = placement.row;
+      let nextRows = placement.piece.activationRows;
+      if (edge === "top") {
+        nextRow = Math.max(0, Math.min(currentEnd - 1, Math.round((targetY - 14) / session.cellHeight)));
+        nextRows = currentEnd - nextRow;
+      } else {
+        const requestedEnd = Math.max(placement.row + 1, Math.round((targetY + 14) / session.cellHeight));
+        nextRows = Math.min(40, requestedEnd - placement.row);
+      }
+      if (!diagramBuilderCanResizeActivation(session, placement, nextRow, nextRows)) {
+        setDiagramBuilderStatus(session, "Der Aktivitätsbalken muss vollständig auf einer freien Lebenslinie bleiben.", "error");
+        return;
+      }
+      placement.row = nextRow;
+      placement.piece.activationRows = nextRows;
+      handle.classList.add("dragging");
+      applyDiagramBuilderActivationGeometry(session, placement, cell, node);
+      updateDiagramBuilderGridMetrics(session);
+      drawDiagramBuilderConnections(session);
+      setDiagramBuilderStatus(session, `Aktivitätsbalken: ${nextRows} Rasterfeld${nextRows === 1 ? "" : "er"}.`, "success");
+    };
+    const finish = (event) => {
+      if (event.pointerId !== pointerId) return;
+      pointerId = null;
+      handle.classList.remove("dragging");
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+    };
+    handle.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      pointerId = event.pointerId;
+      window.addEventListener("pointermove", move, { passive: false });
+      window.addEventListener("pointerup", finish);
+      window.addEventListener("pointercancel", finish);
+    });
+  };
+  attachResize(topHandle, "top");
+  attachResize(bottomHandle, "bottom");
+  node.append(topHandle, bottomHandle);
+  applyDiagramBuilderActivationGeometry(session, placement, cell, node);
+
+  let finished = false;
+  session.finishEditing = (save) => {
+    if (finished) return;
+    finished = true;
+    if (!save) {
+      placement.row = original.row;
+      placement.piece.activationRows = original.activationRows;
+    }
+    session.editingPlacementId = null;
+    session.finishEditing = null;
+    renderDiagramBuilderWorkspace(session);
+    setDiagramBuilderStatus(session, save ? "Aktivitätsbalken übernommen." : "Bearbeitung abgebrochen.", save ? "success" : "");
+  };
+  node.focus({ preventScroll: true });
 }
 
 function beginDiagramBuilderStateEdit(session, placement, node) {
@@ -3676,6 +3894,7 @@ function appendDiagramBuilderDecisionTableContent(node, piece, labelText) {
 }
 
 function appendDiagramBuilderPieceContent(node, piece, labelText) {
+  if (piece.kind === "sequence-activation") return;
   if (["actor", "sequence-actor"].includes(piece.kind)) {
     appendDiagramBuilderActorContent(node, labelText);
     return;
@@ -3708,6 +3927,7 @@ function renderDiagramBuilderPalette(session) {
     }
     appendDiagramBuilderPieceContent(button, piece, piece.paletteLabel);
     button.title = `${piece.paletteLabel} halten und ins Raster ziehen`;
+    button.setAttribute("aria-label", piece.paletteLabel);
     button.setAttribute("aria-pressed", String(session.armedPieceIndex === index));
     if (session.armedPieceIndex === index) button.classList.add("placement-active");
     button.addEventListener("pointerdown", (event) => beginDiagramBuilderPaletteDrag(session, index, button, event));
@@ -4432,6 +4652,11 @@ function createDiagramBuilderPlacedNode(session, placement) {
   const node = createElement("div", `diagram-builder-piece ${placement.piece.kind}`);
   node.draggable = false;
   const pieceMetrics = applyDiagramBuilderPieceMetrics(node, placement.piece);
+  if (placement.piece.kind === "sequence-activation") {
+    pieceMetrics.elementHeight = diagramBuilderActivationHeight(session, placement.piece);
+    pieceMetrics.visualHeight = pieceMetrics.elementHeight;
+    applyDiagramBuilderActivationGeometry(session, placement, cell, node);
+  }
   node.tabIndex = 0;
   node.setAttribute("role", "button");
   node.setAttribute("aria-label", `${placement.piece.label || placement.piece.paletteLabel}; Doppelklick zum Bearbeiten`);
@@ -4473,7 +4698,9 @@ function createDiagramBuilderPlacedNode(session, placement) {
   cell.addEventListener("contextmenu", (event) => event.preventDefault());
   const handles = createElement("div", "diagram-builder-connection-handles");
   const centerX = placementSpan.columns * session.cellWidth / 2;
-  const centerY = placementSpan.rows * session.cellHeight / 2;
+  const centerY = placement.piece.kind === "sequence-activation"
+    ? 14 + pieceMetrics.elementHeight / 2
+    : placementSpan.rows * session.cellHeight / 2;
   const handleBox = {
     left: centerX - pieceMetrics.elementWidth / 2,
     right: centerX + pieceMetrics.elementWidth / 2,
@@ -4573,8 +4800,8 @@ function createDiagramBuilderPlacedNode(session, placement) {
     }
     if (!diagramBuilderCanPlacePiece(session, placement.piece, targetCell.row, targetCell.column, placement.id)) {
       const message = placement.piece.kind === "sequence-activation"
-        ? "Ein Aktivitätsbalken muss auf einer Lifeline liegen."
-        : "Dieses Rasterfeld ist belegt oder die Lifeline würde einen Aktivitätsbalken verlieren.";
+        ? "Ein Aktivitätsbalken muss auf einer Lebenslinie liegen."
+        : "Dieses Rasterfeld ist belegt oder die Lebenslinie würde einen Aktivitätsbalken verlieren.";
       setDiagramBuilderStatus(session, message, "error");
       return;
     }
@@ -4878,7 +5105,7 @@ function addDiagramBuilderPlacement(session, piece, row, column) {
   if (!diagramBuilderCanPlacePiece(session, piece, row, column)) {
     setDiagramBuilderStatus(
       session,
-      piece.kind === "sequence-activation" ? "Ein Aktivitätsbalken muss auf einer Lifeline liegen." : "Dieses Rasterfeld ist bereits belegt.",
+      piece.kind === "sequence-activation" ? "Ein Aktivitätsbalken muss auf einer Lebenslinie liegen." : "Dieses Rasterfeld ist bereits belegt.",
       "error"
     );
     return false;
@@ -4889,9 +5116,10 @@ function addDiagramBuilderPlacement(session, piece, row, column) {
     placedPiece.actions = diagramBuilderDecisionTableRows(placedPiece, "actions", "-");
   }
   if (diagramBuilderIsSequenceParticipant(placedPiece)) {
-    placedPiece.lifelineRows = Math.max(1, Number(placedPiece.lifelineRows) || 5);
+    placedPiece.lifelineRows = Math.max(1, Number(placedPiece.lifelineRows) || 1);
     placedPiece.lifelineEndX = Boolean(placedPiece.lifelineEndX);
   }
+  if (placedPiece.kind === "sequence-activation") placedPiece.activationRows = 1;
   const placement = { id: ++session.nextPlacementId, piece: placedPiece, row, column };
   session.placements.push(placement);
   session.selectedPlacementId = placement.id;
@@ -4932,16 +5160,20 @@ function renderDiagramBuilderWorkspace(session) {
   window.requestAnimationFrame(() => drawDiagramBuilderConnections(session));
 }
 
-function createDiagramBuilderLifelineNode(session, placement) {
+function applyDiagramBuilderLifelineGeometry(session, placement, lifeline) {
   const metrics = diagramBuilderPieceMetrics(placement.piece);
-  const length = Math.max(1, Number(placement.piece.lifelineRows) || 5);
+  const length = Math.max(1, Number(placement.piece.lifelineRows) || 1);
   const startY = (placement.row + 0.5) * session.cellHeight + metrics.elementHeight / 2;
-  const endY = (placement.row + length + 0.5) * session.cellHeight;
-  const lifeline = createElement("div", `diagram-builder-sequence-lifeline${placement.piece.lifelineEndX ? " has-destruction" : ""}`);
-  lifeline.dataset.participantId = String(placement.id);
+  const endY = startY + length * session.cellHeight;
   lifeline.style.left = `${(placement.column + 0.5) * session.cellWidth}px`;
   lifeline.style.top = `${startY}px`;
   lifeline.style.height = `${Math.max(18, endY - startY)}px`;
+}
+
+function createDiagramBuilderLifelineNode(session, placement) {
+  const lifeline = createElement("div", `diagram-builder-sequence-lifeline${placement.piece.lifelineEndX ? " has-destruction" : ""}`);
+  lifeline.dataset.participantId = String(placement.id);
+  applyDiagramBuilderLifelineGeometry(session, placement, lifeline);
   if (placement.piece.lifelineEndX) lifeline.append(createElement("span", "diagram-builder-sequence-destruction"));
   return lifeline;
 }
@@ -5198,8 +5430,8 @@ function openDiagramBuilderMode(file) {
     clearDiagramBuilderRepositionPreview(session);
     if (!diagramBuilderCanPlacePiece(session, placement.piece, targetCell.row, targetCell.column, placement.id)) {
       const message = placement.piece.kind === "sequence-activation"
-        ? "Ein Aktivitätsbalken muss auf einer Lifeline liegen."
-        : "Dieses Rasterfeld ist belegt oder die Lifeline würde einen Aktivitätsbalken verlieren.";
+        ? "Ein Aktivitätsbalken muss auf einer Lebenslinie liegen."
+        : "Dieses Rasterfeld ist belegt oder die Lebenslinie würde einen Aktivitätsbalken verlieren.";
       setDiagramBuilderStatus(session, message, "error");
       return;
     }
@@ -5225,7 +5457,7 @@ function openDiagramBuilderMode(file) {
     const targetCell = diagramBuilderCellFromPoint(session, event.clientX, event.clientY);
     if (!diagramBuilderCanPlacePiece(session, session.pieces[session.armedPieceIndex], targetCell.row, targetCell.column)) {
       const message = session.pieces[session.armedPieceIndex]?.kind === "sequence-activation"
-        ? "Ein Aktivitätsbalken muss auf einer Lifeline liegen."
+        ? "Ein Aktivitätsbalken muss auf einer Lebenslinie liegen."
         : "Dieses Rasterfeld ist bereits belegt.";
       setDiagramBuilderStatus(session, message, "error");
       updateDiagramBuilderCursorPiece(session, event.clientX, event.clientY);

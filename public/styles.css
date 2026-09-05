@@ -2571,35 +2571,41 @@ body.folder-tree-resizing {
 .diagram-builder-palette-item.sequence-activation {
   min-width: 14px;
   width: 14px;
-  min-height: 72px;
-  height: 72px;
+  min-height: 24px;
+  height: var(--builder-activation-height, 72px);
   padding: 0;
   border-radius: 0;
   border-color: #9fb2c9;
   background: #293548;
 }
 
-.diagram-builder-palette-item.sequence-activation {
-  margin: 0 42px;
-  overflow: visible;
+.diagram-builder-cell-item .diagram-builder-piece.sequence-activation {
+  align-self: start;
+  margin-top: 4px;
 }
 
-.diagram-builder-palette-item.sequence-activation .diagram-builder-piece-label {
-  position: absolute;
-  top: 76px;
-  left: 50%;
-  width: 120px;
-  color: #cfd7e5;
-  transform: translateX(-50%);
+.diagram-builder-palette-item.sequence-activation {
+  height: 72px;
+  margin: 0 42px;
+  overflow: visible;
 }
 
 .diagram-builder-sequence-lifeline {
   position: absolute;
   z-index: 0;
   width: 0;
-  border-left: 1px dashed rgba(189, 200, 216, 0.72);
+  border-left: 1px dashed rgba(189, 200, 216, 0.82);
   pointer-events: none;
   transform: translateX(-50%);
+}
+
+.diagram-builder-sequence-lifeline.editing {
+  z-index: 15;
+  pointer-events: auto;
+}
+
+.diagram-builder-sequence-lifeline.editing > .diagram-builder-sequence-destruction {
+  display: none;
 }
 
 .diagram-builder-sequence-destruction {
@@ -2636,7 +2642,7 @@ body.folder-tree-resizing {
   top: calc(100% + 7px);
   left: 50%;
   display: grid;
-  gap: 7px;
+  gap: 6px;
   width: 210px;
   padding: 10px;
   border: 1px solid #74518a;
@@ -2647,8 +2653,7 @@ body.folder-tree-resizing {
   transform: translateX(-50%);
 }
 
-.diagram-builder-sequence-participant-name,
-.diagram-builder-sequence-length-input {
+.diagram-builder-sequence-participant-name {
   min-width: 0;
   padding: 6px 7px;
   border: 1px solid #51405f;
@@ -2659,27 +2664,133 @@ body.folder-tree-resizing {
   font: 600 9px/1.2 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
 }
 
-.diagram-builder-sequence-participant-name:focus,
-.diagram-builder-sequence-length-input:focus {
+.diagram-builder-sequence-participant-name:focus {
   border-color: #c77dff;
   box-shadow: 0 0 0 2px rgba(199, 125, 255, 0.16);
 }
 
-.diagram-builder-sequence-editor-row {
-  display: grid;
-  grid-template-columns: 1fr 58px;
-  align-items: center;
-  gap: 8px;
+.diagram-builder-sequence-editor-hint {
+  color: #9e91a8;
   font: 600 8px/1.2 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  text-align: center;
 }
 
-.diagram-builder-sequence-editor-row.checkbox {
-  grid-template-columns: auto 1fr;
-  justify-items: start;
+.diagram-builder-lifeline-end-control,
+.diagram-builder-activation-resize-handle {
+  position: absolute;
+  z-index: 20;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid #c77dff;
+  border-radius: 50%;
+  color: #eef3fb;
+  background: #2d1938;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55);
+  cursor: ns-resize;
+  place-items: center;
+  touch-action: none;
 }
 
-.diagram-builder-sequence-editor-row.checkbox input {
-  accent-color: #c77dff;
+.diagram-builder-lifeline-end-control {
+  bottom: 0;
+  left: 0;
+  transform: translate(-50%, 50%);
+}
+
+.diagram-builder-lifeline-end-control::before {
+  width: 8px;
+  height: 8px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  content: "";
+}
+
+.diagram-builder-lifeline-end-control.has-destruction::before {
+  width: 12px;
+  height: 2px;
+  border: 0;
+  border-radius: 0;
+  background: currentColor;
+  box-shadow: none;
+  transform: rotate(45deg);
+}
+
+.diagram-builder-lifeline-end-control.has-destruction::after {
+  position: absolute;
+  width: 12px;
+  height: 2px;
+  content: "";
+  background: currentColor;
+  transform: rotate(-45deg);
+}
+
+.diagram-builder-lifeline-end-control:hover,
+.diagram-builder-lifeline-end-control:focus-visible,
+.diagram-builder-lifeline-end-control.dragging,
+.diagram-builder-activation-resize-handle:hover,
+.diagram-builder-activation-resize-handle:focus-visible,
+.diagram-builder-activation-resize-handle.dragging {
+  border-color: #fff;
+  outline: none;
+  background: #6e3e86;
+  box-shadow: 0 0 0 4px rgba(199, 125, 255, 0.2), 0 6px 18px rgba(0, 0, 0, 0.62);
+}
+
+.diagram-builder-activation-resize-handle {
+  left: 50%;
+  width: 20px;
+  height: 12px;
+  border-radius: 5px;
+  transform: translateX(-50%);
+}
+
+.diagram-builder-activation-resize-handle::before {
+  width: 8px;
+  height: 2px;
+  content: "";
+  background: currentColor;
+  box-shadow: 0 3px 0 currentColor;
+}
+
+.diagram-builder-activation-resize-handle.top { top: -7px; }
+.diagram-builder-activation-resize-handle.bottom { bottom: -7px; }
+
+.diagram-builder-marker-preview.lifeline-open,
+.diagram-builder-marker-preview.lifeline-destruction {
+  background: repeating-linear-gradient(to bottom, currentColor 0 4px, transparent 4px 7px) 8px 0 / 1px 20px no-repeat;
+}
+
+.diagram-builder-marker-preview.lifeline-open::after {
+  position: absolute;
+  bottom: 0;
+  left: 4px;
+  width: 8px;
+  height: 8px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  content: "";
+  background: #191220;
+}
+
+.diagram-builder-marker-preview.lifeline-destruction::before,
+.diagram-builder-marker-preview.lifeline-destruction::after {
+  position: absolute;
+  bottom: 4px;
+  left: 2px;
+  width: 13px;
+  height: 2px;
+  content: "";
+  background: currentColor;
+}
+
+.diagram-builder-marker-preview.lifeline-destruction::before { transform: rotate(45deg); }
+.diagram-builder-marker-preview.lifeline-destruction::after { transform: rotate(-45deg); }
+
+.diagram-builder-piece.sequence-activation-editing {
+  border-color: #c77dff;
+  box-shadow: 0 0 0 2px rgba(199, 125, 255, 0.2), 0 8px 20px rgba(0, 0, 0, 0.42);
 }
 
 .diagram-builder-piece.sequence-fragment,
