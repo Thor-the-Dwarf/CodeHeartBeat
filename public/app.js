@@ -2647,6 +2647,7 @@ function createDiagramBuilderPieces(file, viewType = "activity") {
     pap: [
       diagramBuilderPiece("pap-start", "Start"),
       diagramBuilderPiece("pap-process", "Verarbeitung"),
+      diagramBuilderPiece("pap-decision", "Entscheidungsraute"),
       diagramBuilderPiece("pap-decision-table", "Entscheidungstabelle"),
       diagramBuilderPiece("pap-output", "Ein-/Ausgabe"),
       diagramBuilderPiece("pap-end", "Ende")
