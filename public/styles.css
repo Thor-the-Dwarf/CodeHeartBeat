@@ -1182,6 +1182,12 @@ body.folder-tree-resizing {
   cursor: grab;
   font: 600 8px/1.3 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
   text-overflow: ellipsis;
+  touch-action: none;
+}
+
+.diagram-builder-palette-item:active,
+.diagram-builder-palette-item.placement-active {
+  cursor: grabbing;
 }
 
 .diagram-builder-palette-item:hover,

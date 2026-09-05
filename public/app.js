@@ -2779,20 +2779,64 @@ function updateDiagramBuilderRepositionPreview(session, clientX, clientY) {
   preview.classList.toggle("invalid", Boolean(diagramBuilderPlacementAt(session, cell.row, cell.column, placement.id)));
 }
 
-function armDiagramBuilderPiece(session, pieceIndex, button, event) {
-  if (session.armedPieceIndex === pieceIndex) {
-    clearDiagramBuilderPlacementMode(session, "Platzierung abgebrochen.");
-    return;
-  }
-  clearDiagramBuilderConnectionMode(session);
-  clearDiagramBuilderPlacementMode(session);
-  session.armedPieceIndex = pieceIndex;
-  session.overlay.classList.add("placing-piece");
-  session.surface.classList.add("placing-piece");
-  button.classList.add("placement-active");
-  button.setAttribute("aria-pressed", "true");
-  setDiagramBuilderStatus(session, `„${session.pieces[pieceIndex].paletteLabel}“ aufgenommen – im Raster bewegen und mit Linksklick platzieren.`, "placing");
-  updateDiagramBuilderFloatingCursor(session, event.clientX, event.clientY);
+function beginDiagramBuilderPaletteDrag(session, pieceIndex, button, event) {
+  if (event.button !== 0) return;
+  const drag = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    active: false
+  };
+  const move = (moveEvent) => {
+    if (moveEvent.pointerId !== drag.pointerId) return;
+    if (!drag.active && Math.hypot(moveEvent.clientX - drag.startX, moveEvent.clientY - drag.startY) < 6) return;
+    moveEvent.preventDefault();
+    if (!drag.active) {
+      drag.active = true;
+      session.paletteDragging = true;
+      clearDiagramBuilderConnectionMode(session);
+      clearDiagramBuilderPlacementMode(session);
+      session.armedPieceIndex = pieceIndex;
+      session.overlay.classList.add("placing-piece");
+      session.surface.classList.add("placing-piece");
+      button.classList.add("placement-active");
+      button.setAttribute("aria-pressed", "true");
+      setDiagramBuilderStatus(session, `„${session.pieces[pieceIndex].paletteLabel}“ aufgenommen – im Raster loslassen.`, "placing");
+    }
+    const surfaceRect = session.surface.getBoundingClientRect();
+    const overSurface = moveEvent.clientX >= surfaceRect.left && moveEvent.clientX <= surfaceRect.right
+      && moveEvent.clientY >= surfaceRect.top && moveEvent.clientY <= surfaceRect.bottom;
+    if (overSurface) updateDiagramBuilderCursorPiece(session, moveEvent.clientX, moveEvent.clientY);
+    else {
+      session.surface.querySelector(".diagram-builder-cursor-piece")?.remove();
+      updateDiagramBuilderFloatingCursor(session, moveEvent.clientX, moveEvent.clientY);
+    }
+  };
+  const finish = (finishEvent, cancelled = false) => {
+    if (finishEvent.pointerId !== drag.pointerId) return;
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", finish);
+    window.removeEventListener("pointercancel", cancel);
+    session.paletteDragging = false;
+    if (!drag.active) return;
+    finishEvent.preventDefault();
+    finishEvent.stopPropagation();
+    const piece = session.pieces[pieceIndex];
+    const surfaceRect = session.surface.getBoundingClientRect();
+    const overSurface = !cancelled && finishEvent.clientX >= surfaceRect.left && finishEvent.clientX <= surfaceRect.right
+      && finishEvent.clientY >= surfaceRect.top && finishEvent.clientY <= surfaceRect.bottom;
+    const targetCell = overSurface ? diagramBuilderCellFromPoint(session, finishEvent.clientX, finishEvent.clientY) : null;
+    clearDiagramBuilderPlacementMode(session);
+    if (!piece || !targetCell) {
+      setDiagramBuilderStatus(session, "Baustein wurde nicht platziert und ist in die Leiste zurückgekehrt.");
+      return;
+    }
+    addDiagramBuilderPlacement(session, piece, targetCell.row, targetCell.column);
+  };
+  const cancel = (cancelEvent) => finish(cancelEvent, true);
+  window.addEventListener("pointermove", move, { passive: false });
+  window.addEventListener("pointerup", finish);
+  window.addEventListener("pointercancel", cancel);
 }
 
 function beginDiagramBuilderLabelEdit(session, placement) {
@@ -2831,7 +2875,7 @@ function beginDiagramBuilderLabelEdit(session, placement) {
 function renderDiagramBuilderPalette(session) {
   session.paletteWrap.classList.remove("trash-active");
   session.palette.classList.remove("trash-mode");
-  session.paletteLabel.textContent = "BAUSTEINE · anklicken und im Raster platzieren";
+  session.paletteLabel.textContent = "BAUSTEINE · halten und ins Raster ziehen";
   session.palette.replaceChildren();
   session.pieces.forEach((piece, index) => {
     const button = createElement("button", `diagram-builder-palette-item ${piece.kind}`);
@@ -2840,10 +2884,10 @@ function renderDiagramBuilderPalette(session) {
       applyDiagramBuilderPieceMetrics(button, { ...piece, label: piece.paletteLabel });
     }
     button.append(createElement("span", "diagram-builder-piece-label", piece.paletteLabel));
-    button.title = `${piece.paletteLabel} aufnehmen und im Raster platzieren`;
+    button.title = `${piece.paletteLabel} halten und ins Raster ziehen`;
     button.setAttribute("aria-pressed", String(session.armedPieceIndex === index));
     if (session.armedPieceIndex === index) button.classList.add("placement-active");
-    button.addEventListener("click", (event) => armDiagramBuilderPiece(session, index, button, event));
+    button.addEventListener("pointerdown", (event) => beginDiagramBuilderPaletteDrag(session, index, button, event));
     session.palette.append(button);
   });
 }
@@ -3872,17 +3916,17 @@ function openDiagramBuilderMode(file) {
   const main = createElement("div", "diagram-builder-main");
   const left = createElement("section", "diagram-builder-left");
   const paletteWrap = createElement("div", "diagram-builder-palette-wrap");
-  const paletteLabel = createElement("div", "diagram-builder-pane-label", "BAUSTEINE · anklicken und im Raster platzieren");
+  const paletteLabel = createElement("div", "diagram-builder-pane-label", "BAUSTEINE · halten und ins Raster ziehen");
   paletteWrap.append(paletteLabel);
   const palette = createElement("div", "diagram-builder-palette");
   paletteWrap.append(palette);
-  const status = createElement("div", "diagram-builder-status", "Jedes Rasterfeld nimmt genau ein Element auf.");
+  const status = createElement("div", "diagram-builder-status", "Baustein halten, ins Raster ziehen und dort loslassen.");
   status.setAttribute("aria-live", "polite");
   const canvasViewport = createElement("div", "diagram-builder-canvas-viewport");
   const surface = createElement("div", "diagram-builder-surface");
   surface.setAttribute("aria-label", "Zeichenfläche für das UML-Diagramm");
   const emptyHint = createElement("div", "diagram-builder-empty");
-  emptyHint.append(createElement("strong", "", "Baustein auswählen"), createElement("span", "", "Klicke oben auf ein Element und platziere es hier mit Linksklick."));
+  emptyHint.append(createElement("strong", "", "Baustein aufnehmen"), createElement("span", "", "Halte oben ein Element und ziehe es in dieses Raster."));
   surface.append(emptyHint);
   canvasViewport.append(surface);
   left.append(paletteWrap, status, canvasViewport);
@@ -3928,6 +3972,7 @@ function openDiagramBuilderMode(file) {
     selectedPlacementId: null,
     selectedSwimlaneId: null,
     armedPieceIndex: null,
+    paletteDragging: false,
     previewCell: null,
     contextPlacementId: null,
     pendingConnection: null,
@@ -3962,7 +4007,7 @@ function openDiagramBuilderMode(file) {
     updateDiagramBuilderFloatingCursor(session, event.clientX, event.clientY);
   });
   codePane.addEventListener("pointerenter", () => {
-    if (Number.isInteger(session.armedPieceIndex)) clearDiagramBuilderPlacementMode(session, "Platzierung beim Wechsel zum Code beendet.");
+    if (!session.paletteDragging && Number.isInteger(session.armedPieceIndex)) clearDiagramBuilderPlacementMode(session, "Platzierung beim Wechsel zum Code beendet.");
   });
 
   surface.addEventListener("dragover", (event) => {
