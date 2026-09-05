@@ -1127,7 +1127,7 @@ body.folder-tree-resizing {
 
 .diagram-builder-left {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   isolation: isolate;
   background: #0b0911;
 }
@@ -1276,17 +1276,16 @@ body.folder-tree-resizing {
 }
 
 .diagram-builder-status {
-  position: relative;
-  z-index: 19;
-  display: flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 0 16px;
+  position: absolute;
+  z-index: 5;
+  top: 13px;
+  right: 17px;
+  left: 17px;
   overflow: hidden;
-  border-bottom: 1px solid rgba(199, 125, 255, 0.16);
   color: #756780;
-  background: #0e0b14;
-  font-size: 8px;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

@@ -2876,7 +2876,7 @@ function beginDiagramBuilderLabelEdit(session, placement) {
 function renderDiagramBuilderPalette(session) {
   session.paletteWrap.classList.remove("trash-active");
   session.palette.classList.remove("trash-mode");
-  session.paletteLabel.textContent = "BAUSTEINE · halten und ins Raster ziehen";
+  session.paletteLabel.textContent = "Baustein halten, ins Raster ziehen und dort loslassen.";
   session.palette.replaceChildren();
   session.pieces.forEach((piece, index) => {
     const button = createElement("button", `diagram-builder-palette-item ${piece.kind}`);
@@ -3964,12 +3964,11 @@ function openDiagramBuilderMode(file) {
   const main = createElement("div", "diagram-builder-main");
   const left = createElement("section", "diagram-builder-left");
   const paletteWrap = createElement("div", "diagram-builder-palette-wrap");
-  const paletteLabel = createElement("div", "diagram-builder-pane-label", "BAUSTEINE · halten und ins Raster ziehen");
-  paletteWrap.append(paletteLabel);
-  const palette = createElement("div", "diagram-builder-palette");
-  paletteWrap.append(palette);
   const status = createElement("div", "diagram-builder-status", "Baustein halten, ins Raster ziehen und dort loslassen.");
   status.setAttribute("aria-live", "polite");
+  paletteWrap.append(status);
+  const palette = createElement("div", "diagram-builder-palette");
+  paletteWrap.append(palette);
   const canvasViewport = createElement("div", "diagram-builder-canvas-viewport");
   const surface = createElement("div", "diagram-builder-surface");
   surface.setAttribute("aria-label", "Zeichenfläche für das UML-Diagramm");
@@ -3977,7 +3976,7 @@ function openDiagramBuilderMode(file) {
   emptyHint.append(createElement("strong", "", "Baustein aufnehmen"), createElement("span", "", "Halte oben ein Element und ziehe es in dieses Raster."));
   surface.append(emptyHint);
   canvasViewport.append(surface);
-  left.append(paletteWrap, status, canvasViewport);
+  left.append(paletteWrap, canvasViewport);
   const { pane: codePane, viewport: codeViewport, codeList, codeLines } = createDiagramBuilderCodePane(file);
   main.append(codePane, left);
   const toast = createElement("div", "diagram-builder-confirm-toast");
@@ -4002,7 +4001,7 @@ function openDiagramBuilderMode(file) {
     selector,
     palette,
     paletteWrap,
-    paletteLabel,
+    paletteLabel: status,
     canvasViewport,
     surface,
     emptyHint,
