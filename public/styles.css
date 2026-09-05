@@ -1031,7 +1031,7 @@ body.folder-tree-resizing {
 
 .diagram-builder-header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto auto minmax(0, 1fr);
   align-items: center;
   gap: 12px;
   min-width: 0;
@@ -1039,6 +1039,14 @@ body.folder-tree-resizing {
   border-bottom: 1px solid rgba(199, 125, 255, 0.25);
   background: rgba(12, 9, 18, 0.97);
   box-shadow: 0 8px 26px rgba(0, 0, 0, 0.44);
+}
+
+.diagram-builder-title {
+  margin: 0;
+  color: #ede8f5;
+  font: 800 16px/1 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
 }
 
 .diagram-builder-back-button {
@@ -4309,7 +4317,7 @@ body.folder-tree-resizing {
 
 @media (max-width: 900px) {
   .diagram-builder-header {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: auto auto minmax(0, 1fr);
     padding: 0 12px;
   }
 

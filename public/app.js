@@ -6590,6 +6590,7 @@ function openDiagramBuilderMode(file) {
   const header = createElement("header", "diagram-builder-header");
   const backButton = createElement("button", "diagram-builder-back-button", "← Zurück");
   backButton.type = "button";
+  const title = createElement("h1", "diagram-builder-title", "DIAGRAMME ZEICHNEN");
   const viewButtons = createElement("nav", "diagram-builder-view-buttons");
   viewButtons.setAttribute("aria-label", "Diagrammart auswählen");
   const diagramViewButtons = ["class", "state", "usecase", "activity", "sequence", "pap"].map((viewType) => {
@@ -6600,7 +6601,7 @@ function openDiagramBuilderMode(file) {
     viewButtons.append(button);
     return button;
   });
-  header.append(backButton, viewButtons);
+  header.append(backButton, title, viewButtons);
 
   const main = createElement("div", "diagram-builder-main");
   const left = createElement("section", "diagram-builder-left");
