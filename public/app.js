@@ -2911,8 +2911,27 @@ function confirmDiagramBuilderDeletion(session) {
   setDiagramBuilderStatus(session, "Element und seine Verbindungen wurden gelöscht.", "success");
 }
 
+function diagramBuilderCompactOrthogonalPath(points) {
+  const compactPoints = [];
+  points.forEach((point) => {
+    const previous = compactPoints[compactPoints.length - 1];
+    if (previous && point.x === previous.x && point.y === previous.y) return;
+    compactPoints.push(point);
+    while (compactPoints.length >= 3) {
+      const beforeTurn = compactPoints[compactPoints.length - 3];
+      const turn = compactPoints[compactPoints.length - 2];
+      const afterTurn = compactPoints[compactPoints.length - 1];
+      const sameHorizontalLine = beforeTurn.y === turn.y && turn.y === afterTurn.y;
+      const sameVerticalLine = beforeTurn.x === turn.x && turn.x === afterTurn.x;
+      if (!sameHorizontalLine && !sameVerticalLine) break;
+      compactPoints.splice(compactPoints.length - 2, 1);
+    }
+  });
+  return compactPoints;
+}
+
 function diagramBuilderPathSegments(points) {
-  const compactPoints = points.filter((point, index) => index === 0 || point.x !== points[index - 1].x || point.y !== points[index - 1].y);
+  const compactPoints = diagramBuilderCompactOrthogonalPath(points);
   return compactPoints.slice(1).map((point, index) => ({ from: compactPoints[index], to: point }));
 }
 
@@ -3257,7 +3276,8 @@ function drawDiagramBuilderConnections(session) {
         ? { x: (target.column + (targetSide === "right" ? 1 : 0)) * session.cellWidth, y: targetPort.y }
         : { x: targetPort.x, y: (target.row + (targetSide === "bottom" ? 1 : 0)) * session.cellHeight };
       const addRouteCandidate = (points, routeIndex, laneOffset, detour = false) => {
-        const segments = diagramBuilderPathSegments(points);
+        const compactPoints = diagramBuilderCompactOrthogonalPath(points);
+        const segments = compactPoints.slice(1).map((point, index) => ({ from: compactPoints[index], to: point }));
         const nodeHits = segments.reduce((count, segment) => count + nodeRects.filter((rect) => (
           rect.id !== source.id && rect.id !== target.id && diagramBuilderSegmentHitsRect(segment, rect)
         )).length, 0);
@@ -3269,7 +3289,7 @@ function drawDiagramBuilderConnections(session) {
         )).length, 0);
         const length = segments.reduce((sum, segment) => sum + Math.abs(segment.to.x - segment.from.x) + Math.abs(segment.to.y - segment.from.y), 0);
         routeCandidates.push({
-          points,
+          points: compactPoints,
           segments,
           invalid: sourceReentries > 0 || targetEarlyEntries > 0 || overlaps > 0,
           score: overlaps * 5000
@@ -3330,7 +3350,6 @@ function drawDiagramBuilderConnections(session) {
     const route = routeCandidates[0];
     routedSegments.push(...route.segments);
     const pathData = route.points
-      .filter((point, index, points) => index === 0 || point.x !== points[index - 1].x || point.y !== points[index - 1].y)
       .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
       .join(" ");
     const pathAttributes = {
