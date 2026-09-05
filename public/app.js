@@ -2778,7 +2778,7 @@ function createDiagramBuilderCursorVisual(piece, className) {
   const preview = createElement("div", className);
   const node = createElement("div", `diagram-builder-piece ${piece.kind}`);
   applyDiagramBuilderPieceMetrics(node, piece);
-  node.append(createElement("span", "diagram-builder-piece-label", piece.label));
+  appendDiagramBuilderPieceContent(node, piece, piece.label);
   preview.append(node);
   return preview;
 }
@@ -3012,6 +3012,31 @@ function appendDiagramBuilderStateContent(node, piece) {
   node.append(content);
 }
 
+function appendDiagramBuilderActorContent(node, labelText) {
+  const figure = createElement("span", "diagram-builder-actor-glyph");
+  figure.setAttribute("aria-hidden", "true");
+  figure.append(
+    createElement("span", "diagram-builder-actor-head"),
+    createElement("span", "diagram-builder-actor-body"),
+    createElement("span", "diagram-builder-actor-arms"),
+    createElement("span", "diagram-builder-actor-leg left"),
+    createElement("span", "diagram-builder-actor-leg right")
+  );
+  node.append(figure, createElement("span", "diagram-builder-piece-label", labelText || ""));
+}
+
+function appendDiagramBuilderPieceContent(node, piece, labelText) {
+  if (["actor", "sequence-actor"].includes(piece.kind)) {
+    appendDiagramBuilderActorContent(node, labelText);
+    return;
+  }
+  if (piece.kind === "state") {
+    appendDiagramBuilderStateContent(node, piece);
+    return;
+  }
+  node.append(createElement("span", "diagram-builder-piece-label", labelText || ""));
+}
+
 function renderDiagramBuilderPalette(session) {
   session.paletteWrap.classList.remove("trash-active");
   session.palette.classList.remove("trash-mode");
@@ -3023,7 +3048,7 @@ function renderDiagramBuilderPalette(session) {
     if (!["activity-swimlane", "actor", "sequence-actor", "sequence-activation"].includes(piece.kind)) {
       applyDiagramBuilderPieceMetrics(button, { ...piece, label: piece.paletteLabel });
     }
-    button.append(createElement("span", "diagram-builder-piece-label", piece.paletteLabel));
+    appendDiagramBuilderPieceContent(button, piece, piece.paletteLabel);
     button.title = `${piece.paletteLabel} halten und ins Raster ziehen`;
     button.setAttribute("aria-pressed", String(session.armedPieceIndex === index));
     if (session.armedPieceIndex === index) button.classList.add("placement-active");
@@ -3747,8 +3772,7 @@ function createDiagramBuilderPlacedNode(session, placement) {
   node.tabIndex = 0;
   node.setAttribute("role", "button");
   node.setAttribute("aria-label", `${placement.piece.label || placement.piece.paletteLabel}; Doppelklick zum Bearbeiten`);
-  if (placement.piece.kind === "state") appendDiagramBuilderStateContent(node, placement.piece);
-  else node.append(createElement("span", "diagram-builder-piece-label", placement.piece.label));
+  appendDiagramBuilderPieceContent(node, placement.piece, placement.piece.label);
   cell.append(node);
 
   const selectNode = (event) => {

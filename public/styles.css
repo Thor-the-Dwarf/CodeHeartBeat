@@ -2172,14 +2172,67 @@ body.folder-tree-resizing {
   padding: 0 4px 3px;
   overflow: visible;
   border-color: transparent;
-  background:
-    radial-gradient(circle at 50% 13px, transparent 0 9px, #dbe4ee 9px 11px, transparent 11px),
-    linear-gradient(#dbe4ee, #dbe4ee) 50% 25px / 2px 31px no-repeat,
-    linear-gradient(32deg, transparent 47%, #dbe4ee 48% 51%, transparent 52%) 50% 48px / 42px 27px no-repeat,
-    linear-gradient(-32deg, transparent 47%, #dbe4ee 48% 51%, transparent 52%) 50% 48px / 42px 27px no-repeat,
-    linear-gradient(62deg, transparent 47%, #dbe4ee 48% 51%, transparent 52%) 50% 25px / 46px 27px no-repeat,
-    linear-gradient(-62deg, transparent 47%, #dbe4ee 48% 51%, transparent 52%) 50% 25px / 46px 27px no-repeat;
+  background: transparent;
   box-shadow: none;
+}
+
+.diagram-builder-actor-glyph {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  width: 52px;
+  height: 74px;
+  color: #dbe4ee;
+  transform: translateX(-50%);
+}
+
+.diagram-builder-actor-head {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  transform: translateX(-50%);
+}
+
+.diagram-builder-actor-body {
+  position: absolute;
+  top: 23px;
+  left: 50%;
+  width: 2px;
+  height: 29px;
+  background: currentColor;
+  transform: translateX(-50%);
+}
+
+.diagram-builder-actor-arms {
+  position: absolute;
+  top: 34px;
+  left: 50%;
+  width: 42px;
+  height: 2px;
+  background: currentColor;
+  transform: translateX(-50%);
+}
+
+.diagram-builder-actor-leg {
+  position: absolute;
+  top: 50px;
+  left: 50%;
+  width: 2px;
+  height: 27px;
+  background: currentColor;
+  transform-origin: top center;
+}
+
+.diagram-builder-actor-leg.left {
+  transform: rotate(32deg);
+}
+
+.diagram-builder-actor-leg.right {
+  transform: rotate(-32deg);
 }
 
 .diagram-builder-piece.actor .diagram-builder-piece-label,
@@ -2189,6 +2242,15 @@ body.folder-tree-resizing {
   position: absolute;
   right: -20px;
   bottom: 0;
+  left: -20px;
+  width: auto;
+}
+
+.diagram-builder-piece.actor .diagram-builder-label-editor,
+.diagram-builder-piece.sequence-actor .diagram-builder-label-editor {
+  position: absolute;
+  right: -20px;
+  bottom: -2px;
   left: -20px;
   width: auto;
 }
