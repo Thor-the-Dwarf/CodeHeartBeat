@@ -2672,11 +2672,12 @@ function updateDiagramBuilderGridMetrics(session) {
 
 function diagramBuilderCellFromPoint(session, clientX, clientY) {
   const rect = session.surface.getBoundingClientRect();
+  const zoom = session.gridZoom || 1;
   const columns = Math.max(1, Math.floor(session.surface.clientWidth / session.cellWidth));
   const rows = Math.max(1, Math.floor(session.surface.clientHeight / session.cellHeight));
   return {
-    column: Math.min(columns - 1, Math.max(0, Math.floor((clientX - rect.left) / session.cellWidth))),
-    row: Math.min(rows - 1, Math.max(0, Math.floor((clientY - rect.top) / session.cellHeight)))
+    column: Math.min(columns - 1, Math.max(0, Math.floor((clientX - rect.left) / (session.cellWidth * zoom)))),
+    row: Math.min(rows - 1, Math.max(0, Math.floor((clientY - rect.top) / (session.cellHeight * zoom))))
   };
 }
 
@@ -3217,11 +3218,12 @@ function renderDiagramBuilderEndpointControls(session, connection, route, surfac
     ["end", route.points[route.points.length - 1]]
   ];
   endpoints.forEach(([endpoint, point]) => {
+    const zoom = session.gridZoom || 1;
     const property = endpoint === "start" ? "startMarker" : "endMarker";
     const control = createElement("button", `diagram-builder-endpoint-control ${endpoint}${(connection[property] || (endpoint === "end" ? "control" : "none")) !== "none" ? " has-arrow" : ""}`);
     control.type = "button";
-    control.style.left = `${surfaceRect.left + point.x}px`;
-    control.style.top = `${surfaceRect.top + point.y}px`;
+    control.style.left = `${surfaceRect.left + point.x * zoom}px`;
+    control.style.top = `${surfaceRect.top + point.y * zoom}px`;
     control.title = `${endpoint === "start" ? "Pfeilanfang" : "Pfeilende"} verschieben oder Pfeilspitze wählen`;
     control.setAttribute("aria-label", control.title);
     let endpointDrag = null;
@@ -3337,6 +3339,7 @@ function drawDiagramBuilderConnections(session) {
   layer.append(definitions);
 
   const surfaceRect = session.surface.getBoundingClientRect();
+  const zoom = session.gridZoom || 1;
   const routedSegments = [];
   const automaticSourceSides = diagramBuilderAutomaticSourceSides(session);
   const sourcePortAssignments = diagramBuilderSourcePortAssignments(session, automaticSourceSides);
@@ -3347,10 +3350,10 @@ function drawDiagramBuilderConnections(session) {
     const rect = node.getBoundingClientRect();
     return {
       id: placement.id,
-      left: rect.left - surfaceRect.left - 4,
-      right: rect.right - surfaceRect.left + 4,
-      top: rect.top - surfaceRect.top - 4,
-      bottom: rect.bottom - surfaceRect.top + 4
+      left: (rect.left - surfaceRect.left) / zoom - 4,
+      right: (rect.right - surfaceRect.left) / zoom + 4,
+      top: (rect.top - surfaceRect.top) / zoom - 4,
+      bottom: (rect.bottom - surfaceRect.top) / zoom + 4
     };
   }).filter(Boolean);
   session.connections.forEach((connection) => {
@@ -3364,16 +3367,16 @@ function drawDiagramBuilderConnections(session) {
     const sourceSide = automaticSourceSides.get(connection.id) || "right";
     const fraction = sourcePortAssignments.get(connection.id) || 0.5;
     const sourceBox = {
-      left: sourceRect.left - surfaceRect.left,
-      right: sourceRect.right - surfaceRect.left,
-      top: sourceRect.top - surfaceRect.top,
-      bottom: sourceRect.bottom - surfaceRect.top
+      left: (sourceRect.left - surfaceRect.left) / zoom,
+      right: (sourceRect.right - surfaceRect.left) / zoom,
+      top: (sourceRect.top - surfaceRect.top) / zoom,
+      bottom: (sourceRect.bottom - surfaceRect.top) / zoom
     };
     const targetBox = {
-      left: targetRect.left - surfaceRect.left,
-      right: targetRect.right - surfaceRect.left,
-      top: targetRect.top - surfaceRect.top,
-      bottom: targetRect.bottom - surfaceRect.top
+      left: (targetRect.left - surfaceRect.left) / zoom,
+      right: (targetRect.right - surfaceRect.left) / zoom,
+      top: (targetRect.top - surfaceRect.top) / zoom,
+      bottom: (targetRect.bottom - surfaceRect.top) / zoom
     };
     const sourcePort = diagramBuilderPortOnBox(sourceBox, sourceSide, fraction, source.piece.kind === "activity-decision");
     const sourceBoundary = sourceSide === "left" || sourceSide === "right"
@@ -3740,7 +3743,7 @@ function createDiagramBuilderSwimlaneBoundary(session, swimlane, side, laneNode)
     event.preventDefault();
     const surfaceRect = session.surface.getBoundingClientRect();
     const maximumColumn = Math.max(1, Math.round(session.surface.clientWidth / session.cellWidth));
-    const requestedColumn = Math.round((event.clientX - surfaceRect.left) / session.cellWidth);
+    const requestedColumn = Math.round((event.clientX - surfaceRect.left) / (session.cellWidth * (session.gridZoom || 1)));
     if (side === "left") swimlane.leftColumn = Math.max(0, Math.min(swimlane.rightColumn - 1, requestedColumn));
     else swimlane.rightColumn = Math.min(maximumColumn, Math.max(swimlane.leftColumn + 1, requestedColumn));
     applyDiagramBuilderSwimlaneGeometry(session, swimlane, laneNode);
@@ -3879,9 +3882,36 @@ function renderDiagramBuilderWorkspace(session) {
   window.requestAnimationFrame(() => drawDiagramBuilderConnections(session));
 }
 
+function enableDiagramBuilderPaneZoom(session, viewport, content, zoomProperty, afterZoom = null) {
+  const minimumZoom = 0.45;
+  const maximumZoom = 2.5;
+  viewport.addEventListener("wheel", (event) => {
+    if ((!event.ctrlKey && !event.metaKey) || event.deltaY === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const previousZoom = session[zoomProperty] || 1;
+    const direction = event.deltaY < 0 ? 1 : -1;
+    const nextZoom = Math.min(maximumZoom, Math.max(minimumZoom, Number((previousZoom + direction * 0.1).toFixed(2))));
+    if (nextZoom === previousZoom) return;
+    const viewportRect = viewport.getBoundingClientRect();
+    const localX = event.clientX - viewportRect.left;
+    const localY = event.clientY - viewportRect.top;
+    const contentX = (viewport.scrollLeft + localX) / previousZoom;
+    const contentY = (viewport.scrollTop + localY) / previousZoom;
+    session[zoomProperty] = nextZoom;
+    content.style.zoom = String(nextZoom);
+    window.requestAnimationFrame(() => {
+      viewport.scrollLeft = contentX * nextZoom - localX;
+      viewport.scrollTop = contentY * nextZoom - localY;
+      afterZoom?.();
+    });
+  }, { passive: false });
+}
+
 function createDiagramBuilderCodePane(file) {
   const pane = createElement("section", "diagram-builder-code-pane");
   pane.append(createElement("div", "diagram-builder-pane-label", `JAVA-CODE · ${file.name}`));
+  const viewport = createElement("div", "diagram-builder-code-viewport");
   const codeList = createElement("ol", "diagram-builder-code-list");
   const syntaxState = { inBlockComment: false };
   file.content.replace(/\r/g, "").split("\n").forEach((line, lineIndex) => {
@@ -3892,8 +3922,9 @@ function createDiagramBuilderCodePane(file) {
     lineNode.append(code);
     codeList.append(lineNode);
   });
-  pane.append(codeList);
-  return { pane, codeLines: [...codeList.children] };
+  viewport.append(codeList);
+  pane.append(viewport);
+  return { pane, viewport, codeList, codeLines: [...codeList.children] };
 }
 
 function closeDiagramBuilderMode() {
@@ -3947,7 +3978,7 @@ function openDiagramBuilderMode(file) {
   surface.append(emptyHint);
   canvasViewport.append(surface);
   left.append(paletteWrap, status, canvasViewport);
-  const { pane: codePane, codeLines } = createDiagramBuilderCodePane(file);
+  const { pane: codePane, viewport: codeViewport, codeList, codeLines } = createDiagramBuilderCodePane(file);
   main.append(codePane, left);
   const toast = createElement("div", "diagram-builder-confirm-toast");
   toast.hidden = true;
@@ -3972,9 +4003,12 @@ function openDiagramBuilderMode(file) {
     palette,
     paletteWrap,
     paletteLabel,
+    canvasViewport,
     surface,
     emptyHint,
     status,
+    codeViewport,
+    codeList,
     codeLines,
     viewType: "activity",
     pieces: [],
@@ -3986,6 +4020,8 @@ function openDiagramBuilderMode(file) {
     nextConnectionId: 0,
     cellWidth: DIAGRAM_BUILDER_DEFAULT_CELL_WIDTH,
     cellHeight: DIAGRAM_BUILDER_DEFAULT_CELL_HEIGHT,
+    gridZoom: 1,
+    codeZoom: 1,
     selectedPlacementId: null,
     selectedSwimlaneId: null,
     armedPieceIndex: null,
@@ -4014,6 +4050,8 @@ function openDiagramBuilderMode(file) {
   activeDiagramBuilderSession = session;
   session.resizeObserver = new ResizeObserver(() => drawDiagramBuilderConnections(session));
   session.resizeObserver.observe(surface);
+  enableDiagramBuilderPaneZoom(session, canvasViewport, surface, "gridZoom", () => drawDiagramBuilderConnections(session));
+  enableDiagramBuilderPaneZoom(session, codeViewport, codeList, "codeZoom");
   canvasViewport.addEventListener("scroll", () => {
     if (session.editingConnectionId) window.requestAnimationFrame(() => drawDiagramBuilderConnections(session));
   }, { passive: true });

@@ -2304,15 +2304,23 @@ body.folder-tree-resizing {
   background: #090c13;
 }
 
-.diagram-builder-code-list {
+.diagram-builder-code-viewport {
+  width: 100%;
   height: 100%;
+  overflow: auto;
+  scrollbar-color: #3e3548 #0a0810;
+}
+
+.diagram-builder-code-list {
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 100%;
+  min-height: 100%;
   margin: 0;
   padding: 50px 28px 38px 62px;
-  overflow: auto;
   color: #d7dded;
   font-size: 11px;
   line-height: 1.7;
-  scrollbar-color: #3e3548 #0a0810;
 }
 
 .diagram-builder-code-line {
