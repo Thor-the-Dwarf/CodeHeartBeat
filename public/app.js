@@ -2204,7 +2204,7 @@ function createFolderTreeItem(node, isRoot = false) {
 
   const folderButton = createElement("button", "tree-folder-button");
   const children = createElement("ul", "tree-children");
-  const collapsed = folderCollapsedState.get(node.path) === true;
+  const collapsed = folderCollapsedState.get(node.path) ?? true;
   item.dataset.folderName = node.name;
   item.dataset.folderPath = node.path;
   item.classList.toggle("collapsed", collapsed);
@@ -5021,7 +5021,7 @@ function createFolderNode(folder, isRoot = false) {
   const folderBody = document.createElement("div");
   const directories = (folder.children || []).filter((child) => child.type === "directory");
   const files = (folder.children || []).filter((child) => child.type === "file");
-  const collapsed = folderCollapsedState.get(folder.path) === true;
+  const collapsed = folderCollapsedState.get(folder.path) ?? true;
 
   folderNode.className = `architecture-folder${isRoot ? " root-folder" : ""}`;
   folderNode.classList.toggle("collapsed", collapsed);
