@@ -1529,6 +1529,20 @@ body.folder-tree-resizing {
   box-shadow: inset 0 0 0 1px rgba(199, 125, 255, 0.12);
 }
 
+.diagram-builder-system-boundary.editing,
+.diagram-builder-sequence-fragment-frame.editing,
+.diagram-builder-swimlane.editing {
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.diagram-builder-system-boundary.editing.moving,
+.diagram-builder-sequence-fragment-frame.editing.moving,
+.diagram-builder-swimlane.editing.moving {
+  cursor: grabbing;
+}
+
 .diagram-builder-system-boundary-label,
 .diagram-builder-system-boundary-label-editor {
   position: absolute;

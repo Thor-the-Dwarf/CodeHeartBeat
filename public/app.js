@@ -4318,7 +4318,7 @@ function createDiagramBuilderContainerMoveHandle(session, kind, item, node, opti
     renderDiagramBuilderPalette(session);
   };
   const cancel = (cancelEvent) => finish(cancelEvent, true);
-  handle.addEventListener("pointerdown", (event) => {
+  const beginMove = (event) => {
     if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
@@ -4336,6 +4336,11 @@ function createDiagramBuilderContainerMoveHandle(session, kind, item, node, opti
     window.addEventListener("pointermove", move, { passive: false });
     window.addEventListener("pointerup", finish);
     window.addEventListener("pointercancel", cancel);
+  };
+  handle.addEventListener("pointerdown", beginMove);
+  node.addEventListener("pointerdown", (event) => {
+    if (event.target.closest("input, textarea, select, button")) return;
+    beginMove(event);
   });
   return handle;
 }
