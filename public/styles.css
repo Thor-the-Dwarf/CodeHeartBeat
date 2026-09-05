@@ -1848,9 +1848,22 @@ body.folder-tree-resizing {
   color: #e9e0ef;
   background: #17111d;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.54);
-  cursor: pointer;
+  cursor: grab;
   transform: translate(-50%, -50%);
   font: 800 8px/1 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.diagram-builder-endpoint-control.dragging {
+  border-color: #fff;
+  background: #6e3e86;
+  box-shadow: 0 0 0 5px rgba(199, 125, 255, 0.2), 0 6px 18px rgba(0, 0, 0, 0.62);
+  cursor: grabbing;
+  transform: translate(-50%, -50%) scale(1.12);
+}
+
+.diagram-builder-piece.endpoint-drop-target {
+  border-color: #72dca5;
+  box-shadow: 0 0 0 3px rgba(114, 220, 165, 0.24), 0 0 16px rgba(114, 220, 165, 0.4);
 }
 
 .diagram-builder-endpoint-control.has-arrow {

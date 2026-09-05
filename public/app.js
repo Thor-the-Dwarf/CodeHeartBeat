@@ -3091,7 +3091,9 @@ function beginDiagramBuilderConnectionLabelEdit(session, connection, clientX, cl
   const original = {
     label: connection.label || "",
     startMarker: connection.startMarker || "none",
-    endMarker: connection.endMarker || "control"
+    endMarker: connection.endMarker || "control",
+    sourceId: connection.sourceId,
+    targetId: connection.targetId
   };
   const editor = createElement("input", "diagram-builder-connection-label-editor");
   editor.type = "text";
@@ -3111,6 +3113,8 @@ function beginDiagramBuilderConnectionLabelEdit(session, connection, clientX, cl
       connection.label = original.label;
       connection.startMarker = original.startMarker;
       connection.endMarker = original.endMarker;
+      connection.sourceId = original.sourceId;
+      connection.targetId = original.targetId;
     }
     editor.remove();
     session.overlay.querySelectorAll(".diagram-builder-endpoint-control, .diagram-builder-endpoint-menu").forEach((item) => item.remove());
@@ -3160,20 +3164,83 @@ function openDiagramBuilderEndpointMenu(session, connection, endpoint, clientX, 
 function renderDiagramBuilderEndpointControls(session, connection, route, surfaceRect) {
   if (session.editingConnectionId !== connection.id) return;
   const endpoints = [
-    ["start", "A", route.points[0]],
-    ["end", "E", route.points[route.points.length - 1]]
+    ["start", route.points[0]],
+    ["end", route.points[route.points.length - 1]]
   ];
-  endpoints.forEach(([endpoint, label, point]) => {
+  endpoints.forEach(([endpoint, point]) => {
     const property = endpoint === "start" ? "startMarker" : "endMarker";
-    const control = createElement("button", `diagram-builder-endpoint-control ${endpoint}${(connection[property] || (endpoint === "end" ? "control" : "none")) !== "none" ? " has-arrow" : ""}`, label);
+    const control = createElement("button", `diagram-builder-endpoint-control ${endpoint}${(connection[property] || (endpoint === "end" ? "control" : "none")) !== "none" ? " has-arrow" : ""}`);
     control.type = "button";
     control.style.left = `${surfaceRect.left + point.x}px`;
     control.style.top = `${surfaceRect.top + point.y}px`;
-    control.title = `Pfeilspitze am ${endpoint === "start" ? "Anfang" : "Ende"} wählen`;
+    control.title = `${endpoint === "start" ? "Pfeilanfang" : "Pfeilende"} verschieben oder Pfeilspitze wählen`;
     control.setAttribute("aria-label", control.title);
+    let endpointDrag = null;
+    let suppressClick = false;
+    const clearDropTarget = () => {
+      session.surface.querySelectorAll(".endpoint-drop-target").forEach((node) => node.classList.remove("endpoint-drop-target"));
+    };
+    const placementAtPointer = (clientX, clientY) => {
+      const counterpartId = endpoint === "start" ? connection.targetId : connection.sourceId;
+      return session.placements.find((placement) => {
+        if (placement.id === counterpartId) return false;
+        const node = session.surface.querySelector(`[data-placement-id="${placement.id}"] .diagram-builder-piece`);
+        const rect = node?.getBoundingClientRect();
+        return Boolean(rect && clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom);
+      }) || null;
+    };
+    const moveEndpoint = (event) => {
+      if (!endpointDrag || endpointDrag.pointerId !== event.pointerId) return;
+      if (!endpointDrag.active && Math.hypot(event.clientX - endpointDrag.startX, event.clientY - endpointDrag.startY) < 6) return;
+      event.preventDefault();
+      endpointDrag.active = true;
+      suppressClick = true;
+      control.classList.add("dragging");
+      control.style.left = `${event.clientX}px`;
+      control.style.top = `${event.clientY}px`;
+      clearDropTarget();
+      const target = placementAtPointer(event.clientX, event.clientY);
+      if (target) {
+        session.surface.querySelector(`[data-placement-id="${target.id}"] .diagram-builder-piece`)?.classList.add("endpoint-drop-target");
+      }
+    };
+    const finishEndpoint = (event, cancelled = false) => {
+      if (!endpointDrag || endpointDrag.pointerId !== event.pointerId) return;
+      const wasActive = endpointDrag.active;
+      endpointDrag = null;
+      window.removeEventListener("pointermove", moveEndpoint);
+      window.removeEventListener("pointerup", finishEndpoint);
+      window.removeEventListener("pointercancel", cancelEndpoint);
+      if (!wasActive) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const target = cancelled ? null : placementAtPointer(event.clientX, event.clientY);
+      clearDropTarget();
+      if (target) {
+        connection[endpoint === "start" ? "sourceId" : "targetId"] = target.id;
+        setDiagramBuilderStatus(session, `${endpoint === "start" ? "Pfeilanfang" : "Pfeilende"} wurde neu verbunden.`, "success");
+      }
+      drawDiagramBuilderConnections(session);
+      session.overlay.querySelector(".diagram-builder-connection-label-editor")?.focus({ preventScroll: true });
+      window.setTimeout(() => { suppressClick = false; }, 0);
+    };
+    const cancelEndpoint = (event) => finishEndpoint(event, true);
+    control.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      endpointDrag = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        active: false
+      };
+      window.addEventListener("pointermove", moveEndpoint, { passive: false });
+      window.addEventListener("pointerup", finishEndpoint);
+      window.addEventListener("pointercancel", cancelEndpoint);
+    });
     control.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (suppressClick) return;
       openDiagramBuilderEndpointMenu(session, connection, endpoint, event.clientX, event.clientY);
     });
     session.overlay.append(control);
