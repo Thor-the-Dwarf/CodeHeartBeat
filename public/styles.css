@@ -2338,9 +2338,9 @@ body.folder-tree-resizing {
 .diagram-builder-endpoint-menu {
   position: fixed;
   z-index: 1090;
-  display: grid;
+  display: flex;
   gap: 6px;
-  width: 190px;
+  width: max-content;
   padding: 10px;
   border: 1px solid #74518a;
   border-radius: 7px;
@@ -2350,21 +2350,17 @@ body.folder-tree-resizing {
   transform: translate(-50%, 12px);
 }
 
-.diagram-builder-endpoint-menu strong {
-  padding: 3px 4px 5px;
-  color: #ad99ba;
-  font-size: 8px;
-}
-
 .diagram-builder-endpoint-menu button {
-  padding: 7px 9px;
+  display: grid;
+  place-items: center;
+  width: 66px;
+  height: 38px;
+  padding: 0;
   border: 1px solid #463650;
   border-radius: 4px;
   color: #e7deec;
   background: #191220;
   cursor: pointer;
-  font: 600 9px/1.2 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
-  text-align: left;
 }
 
 .diagram-builder-endpoint-menu button.selected,
@@ -2373,6 +2369,81 @@ body.folder-tree-resizing {
   border-color: #c77dff;
   background: #2b1935;
   outline: none;
+}
+
+.diagram-builder-marker-preview {
+  position: relative;
+  display: block;
+  width: 48px;
+  height: 20px;
+  color: #d8e0ed;
+  background: linear-gradient(currentColor, currentColor) left 50% / 42px 2px no-repeat;
+}
+
+.diagram-builder-marker-preview.none {
+  background-size: 48px 2px;
+}
+
+.diagram-builder-marker-preview.control::after {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 9px solid currentColor;
+  content: "";
+  transform: translateY(-50%);
+}
+
+.diagram-builder-marker-preview.activity-open::before,
+.diagram-builder-marker-preview.activity-open::after {
+  position: absolute;
+  right: 0;
+  width: 10px;
+  height: 2px;
+  content: "";
+  background: currentColor;
+  transform-origin: right center;
+}
+
+.diagram-builder-marker-preview.activity-open::before {
+  top: 9px;
+  transform: rotate(30deg);
+}
+
+.diagram-builder-marker-preview.activity-open::after {
+  top: 9px;
+  transform: rotate(-30deg);
+}
+
+.diagram-builder-marker-preview.inheritance::after {
+  position: absolute;
+  top: 50%;
+  right: -1px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid currentColor;
+  content: "";
+  background: #191220;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+  transform: translateY(-50%);
+}
+
+.diagram-builder-marker-preview.aggregation::after,
+.diagram-builder-marker-preview.composition::after {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border: 2px solid currentColor;
+  content: "";
+  background: #191220;
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.diagram-builder-marker-preview.composition::after {
+  background: currentColor;
 }
 
 .diagram-builder-connector-label.loop-back {
