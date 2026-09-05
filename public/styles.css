@@ -2338,9 +2338,9 @@ body.folder-tree-resizing {
 .diagram-builder-endpoint-menu {
   position: fixed;
   z-index: 1090;
-  display: flex;
+  display: grid;
   gap: 6px;
-  width: max-content;
+  width: 220px;
   padding: 10px;
   border: 1px solid #74518a;
   border-radius: 7px;
@@ -2351,11 +2351,12 @@ body.folder-tree-resizing {
 }
 
 .diagram-builder-endpoint-menu button {
-  display: grid;
-  place-items: center;
-  width: 66px;
-  height: 38px;
-  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 42px;
+  padding: 0 10px;
   border: 1px solid #463650;
   border-radius: 4px;
   color: #e7deec;
@@ -2376,6 +2377,7 @@ body.folder-tree-resizing {
   display: block;
   width: 48px;
   height: 20px;
+  flex: 0 0 48px;
   color: #d8e0ed;
   background: linear-gradient(currentColor, currentColor) left 50% / 42px 2px no-repeat;
 }
@@ -2444,6 +2446,15 @@ body.folder-tree-resizing {
 
 .diagram-builder-marker-preview.composition::after {
   background: currentColor;
+}
+
+.diagram-builder-marker-label {
+  overflow: hidden;
+  color: #e7deec;
+  font: 600 9px/1.2 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .diagram-builder-connector-label.loop-back {

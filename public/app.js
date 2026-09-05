@@ -3248,7 +3248,6 @@ function beginDiagramBuilderConnectionLabelEdit(session, connection, clientX, cl
 function openDiagramBuilderEndpointMenu(session, connection, endpoint, clientX, clientY) {
   session.overlay.querySelector(".diagram-builder-endpoint-menu")?.remove();
   const menu = createElement("div", "diagram-builder-endpoint-menu");
-  menu.style.top = `${Math.max(55, Math.min(window.innerHeight - 150, clientY))}px`;
   menu.setAttribute("aria-label", `Pfeilspitze am ${endpoint === "start" ? "Anfang" : "Ende"} wählen`);
   const property = endpoint === "start" ? "startMarker" : "endMarker";
   const markerOptions = [
@@ -3260,15 +3259,20 @@ function openDiagramBuilderEndpointMenu(session, connection, endpoint, clientX, 
     ["aggregation", "Aggregation"],
     ["composition", "Komposition"]
   );
-  const menuHalfWidth = (markerOptions.length * 66 + Math.max(0, markerOptions.length - 1) * 6 + 20) / 2;
+  const menuHalfWidth = 110;
+  const menuHeight = markerOptions.length * 42 + Math.max(0, markerOptions.length - 1) * 6 + 20;
   menu.style.left = `${Math.max(menuHalfWidth + 8, Math.min(window.innerWidth - menuHalfWidth - 8, clientX))}px`;
+  menu.style.top = `${Math.max(8, Math.min(window.innerHeight - menuHeight - 20, clientY))}px`;
   markerOptions.forEach(([value, label]) => {
     const button = createElement("button", connection[property] === value ? "selected" : "");
     button.type = "button";
     button.title = label;
     button.setAttribute("aria-label", label);
     const previewType = value === "control" && session.viewType === "activity" ? "activity-open" : value;
-    button.append(createElement("span", `diagram-builder-marker-preview ${previewType}`));
+    button.append(
+      createElement("span", `diagram-builder-marker-preview ${previewType}`),
+      createElement("span", "diagram-builder-marker-label", label)
+    );
     button.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
