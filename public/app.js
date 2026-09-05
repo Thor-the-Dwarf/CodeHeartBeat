@@ -2730,11 +2730,13 @@ function updateDiagramBuilderGridMetrics(session) {
   const maximumColumn = Math.max(
     0,
     ...session.placements.map((placement) => placement.column),
-    ...session.swimlanes.map((swimlane) => swimlane.rightColumn - 1)
+    ...session.swimlanes.map((swimlane) => swimlane.rightColumn - 1),
+    ...session.systemBoundaries.map((boundary) => boundary.rightColumn - 1)
   );
   const maximumRow = Math.max(
     0,
     ...session.placements.map((placement) => placement.row),
+    ...session.systemBoundaries.map((boundary) => boundary.bottomRow - 1),
     ...session.placements
       .filter((placement) => diagramBuilderIsSequenceParticipant(placement.piece))
       .map((placement) => placement.row + Math.max(1, Number(placement.piece.lifelineRows) || 5))
@@ -2774,6 +2776,7 @@ function diagramBuilderActivationHasLifeline(session, row, column, participantOv
 }
 
 function diagramBuilderCanPlacePiece(session, piece, row, column, ignoredId = null) {
+  if (piece.kind === "boundary") return true;
   if (diagramBuilderPlacementAt(session, row, column, ignoredId)) return false;
   if (piece.kind === "sequence-activation") return diagramBuilderActivationHasLifeline(session, row, column);
   if (!diagramBuilderIsSequenceParticipant(piece) || !ignoredId) return true;
@@ -3897,7 +3900,10 @@ function createDiagramBuilderPlacedNode(session, placement) {
       return;
     }
     session.selectedPlacementId = placement.id;
+    session.selectedSwimlaneId = null;
+    session.selectedSystemBoundaryId = null;
     session.surface.querySelectorAll(".diagram-builder-piece.selected").forEach((item) => item.classList.remove("selected"));
+    session.surface.querySelectorAll(".diagram-builder-swimlane.selected, .diagram-builder-system-boundary.selected").forEach((item) => item.classList.remove("selected"));
     node.classList.add("selected");
   };
   node.addEventListener("click", selectNode);
@@ -4048,6 +4054,121 @@ function createDiagramBuilderPlacedNode(session, placement) {
   return cell;
 }
 
+function applyDiagramBuilderSystemBoundaryGeometry(session, boundary, node) {
+  node.style.left = `${boundary.leftColumn * session.cellWidth}px`;
+  node.style.top = `${boundary.topRow * session.cellHeight}px`;
+  node.style.width = `${(boundary.rightColumn - boundary.leftColumn) * session.cellWidth}px`;
+  node.style.height = `${(boundary.bottomRow - boundary.topRow) * session.cellHeight}px`;
+}
+
+function diagramBuilderGridLineFromPoint(session, clientX, clientY) {
+  const surfaceRect = session.surface.getBoundingClientRect();
+  const zoom = session.gridZoom || 1;
+  return {
+    column: Math.max(0, Math.round((clientX - surfaceRect.left) / (session.cellWidth * zoom))),
+    row: Math.max(0, Math.round((clientY - surfaceRect.top) / (session.cellHeight * zoom)))
+  };
+}
+
+function beginDiagramBuilderSystemBoundaryResize(session, boundary, node, horizontalSide, verticalSide, event) {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  event.stopPropagation();
+  session.selectedPlacementId = null;
+  session.selectedSwimlaneId = null;
+  session.selectedSystemBoundaryId = boundary.id;
+  node.classList.add("selected", "resizing");
+  const pointerId = event.pointerId;
+  const move = (moveEvent) => {
+    if (moveEvent.pointerId !== pointerId) return;
+    moveEvent.preventDefault();
+    const line = diagramBuilderGridLineFromPoint(session, moveEvent.clientX, moveEvent.clientY);
+    if (horizontalSide === "left") boundary.leftColumn = Math.min(boundary.rightColumn - 1, line.column);
+    if (horizontalSide === "right") boundary.rightColumn = Math.max(boundary.leftColumn + 1, line.column);
+    if (verticalSide === "top") boundary.topRow = Math.min(boundary.bottomRow - 1, line.row);
+    if (verticalSide === "bottom") boundary.bottomRow = Math.max(boundary.topRow + 1, line.row);
+    updateDiagramBuilderGridMetrics(session);
+    applyDiagramBuilderSystemBoundaryGeometry(session, boundary, node);
+    setDiagramBuilderStatus(session, "Systemgrenze ist auf den Gridlinien eingerastet.", "success");
+  };
+  const finish = (finishEvent) => {
+    if (finishEvent.pointerId !== pointerId) return;
+    node.classList.remove("resizing");
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", finish);
+    window.removeEventListener("pointercancel", finish);
+  };
+  window.addEventListener("pointermove", move, { passive: false });
+  window.addEventListener("pointerup", finish);
+  window.addEventListener("pointercancel", finish);
+}
+
+function createDiagramBuilderSystemBoundaryHandle(session, boundary, node, className, horizontalSide = null, verticalSide = null) {
+  const handle = createElement("button", `diagram-builder-system-boundary-handle ${className}`);
+  handle.type = "button";
+  const description = horizontalSide && verticalSide
+    ? `${horizontalSide === "left" ? "linken" : "rechten"} ${verticalSide === "top" ? "oberen" : "unteren"} Ecke`
+    : `${horizontalSide === "left" ? "linken" : horizontalSide === "right" ? "rechten" : verticalSide === "top" ? "oberen" : "unteren"} Kante`;
+  handle.setAttribute("aria-label", `Systemgrenze an der ${description} verändern`);
+  handle.title = `${description[0].toUpperCase()}${description.slice(1)} ziehen · rastet auf Gridlinien ein`;
+  handle.addEventListener("pointerdown", (event) => beginDiagramBuilderSystemBoundaryResize(
+    session,
+    boundary,
+    node,
+    horizontalSide,
+    verticalSide,
+    event
+  ));
+  return handle;
+}
+
+function createDiagramBuilderSystemBoundaryNode(session, boundary) {
+  const node = createElement(
+    "section",
+    `diagram-builder-system-boundary${session.selectedSystemBoundaryId === boundary.id ? " selected" : ""}`
+  );
+  node.dataset.systemBoundaryId = String(boundary.id);
+  node.setAttribute("aria-label", "Systemgrenze; Kanten oder Ecken ziehen, um die Größe zu verändern");
+  applyDiagramBuilderSystemBoundaryGeometry(session, boundary, node);
+  node.append(
+    createDiagramBuilderSystemBoundaryHandle(session, boundary, node, "edge top", null, "top"),
+    createDiagramBuilderSystemBoundaryHandle(session, boundary, node, "edge right", "right", null),
+    createDiagramBuilderSystemBoundaryHandle(session, boundary, node, "edge bottom", null, "bottom"),
+    createDiagramBuilderSystemBoundaryHandle(session, boundary, node, "edge left", "left", null),
+    createDiagramBuilderSystemBoundaryHandle(session, boundary, node, "corner top-left", "left", "top"),
+    createDiagramBuilderSystemBoundaryHandle(session, boundary, node, "corner top-right", "right", "top"),
+    createDiagramBuilderSystemBoundaryHandle(session, boundary, node, "corner bottom-right", "right", "bottom"),
+    createDiagramBuilderSystemBoundaryHandle(session, boundary, node, "corner bottom-left", "left", "bottom")
+  );
+  node.addEventListener("click", (event) => {
+    event.stopPropagation();
+    session.selectedPlacementId = null;
+    session.selectedSwimlaneId = null;
+    session.selectedSystemBoundaryId = boundary.id;
+    session.surface.querySelectorAll(".diagram-builder-piece.selected, .diagram-builder-swimlane.selected, .diagram-builder-system-boundary.selected")
+      .forEach((item) => item.classList.remove("selected"));
+    node.classList.add("selected");
+  });
+  return node;
+}
+
+function addDiagramBuilderSystemBoundary(session, row, column) {
+  const boundary = {
+    id: ++session.nextSystemBoundaryId,
+    leftColumn: Math.max(0, column),
+    rightColumn: Math.max(0, column) + 3,
+    topRow: Math.max(0, row),
+    bottomRow: Math.max(0, row) + 3
+  };
+  session.systemBoundaries.push(boundary);
+  session.selectedPlacementId = null;
+  session.selectedSwimlaneId = null;
+  session.selectedSystemBoundaryId = boundary.id;
+  renderDiagramBuilderWorkspace(session);
+  setDiagramBuilderStatus(session, "Systemgrenze platziert. Kanten oder Ecken ziehen, um sie auf den Gridlinien anzupassen.", "success");
+  return true;
+}
+
 function applyDiagramBuilderSwimlaneGeometry(session, swimlane, node) {
   node.style.left = `${swimlane.leftColumn * session.cellWidth}px`;
   node.style.width = `${(swimlane.rightColumn - swimlane.leftColumn) * session.cellWidth}px`;
@@ -4133,7 +4254,10 @@ function createDiagramBuilderSwimlaneNode(session, swimlane) {
   lane.title = "Doppelklick zum Bearbeiten der Swimlane";
   applyDiagramBuilderSwimlaneGeometry(session, swimlane, lane);
   lane.addEventListener("click", () => {
+    session.selectedPlacementId = null;
     session.selectedSwimlaneId = swimlane.id;
+    session.selectedSystemBoundaryId = null;
+    session.surface.querySelectorAll(".diagram-builder-piece.selected, .diagram-builder-system-boundary.selected").forEach((item) => item.classList.remove("selected"));
     session.surface.querySelectorAll(".diagram-builder-swimlane.selected").forEach((item) => item.classList.remove("selected"));
     lane.classList.add("selected");
   });
@@ -4194,6 +4318,7 @@ function addDiagramBuilderSwimlane(session, piece, column) {
 
 function addDiagramBuilderPlacement(session, piece, row, column) {
   if (piece.kind === "activity-swimlane") return addDiagramBuilderSwimlane(session, piece, column);
+  if (piece.kind === "boundary") return addDiagramBuilderSystemBoundary(session, row, column);
   if (!diagramBuilderCanPlacePiece(session, piece, row, column)) {
     setDiagramBuilderStatus(
       session,
@@ -4231,9 +4356,10 @@ function renderDiagramBuilderWorkspace(session) {
   updateDiagramBuilderGridMetrics(session);
   session.connectorLayer = createSvgElement("svg", { class: "diagram-builder-connectors", "aria-hidden": "true" });
   session.surface.replaceChildren(session.connectorLayer, session.emptyHint);
-  session.emptyHint.hidden = session.placements.length > 0 || session.swimlanes.length > 0;
+  session.emptyHint.hidden = session.placements.length > 0 || session.swimlanes.length > 0 || session.systemBoundaries.length > 0;
 
   renderDiagramBuilderPalette(session);
+  session.systemBoundaries.forEach((boundary) => session.surface.append(createDiagramBuilderSystemBoundaryNode(session, boundary)));
   session.swimlanes.forEach((swimlane) => session.surface.append(createDiagramBuilderSwimlaneNode(session, swimlane)));
   session.placements
     .filter((placement) => diagramBuilderIsSequenceParticipant(placement.piece))
@@ -4270,21 +4396,26 @@ function switchDiagramBuilderView(session, nextViewType) {
   session.diagramStates.set(session.viewType, {
     placements: session.placements,
     swimlanes: session.swimlanes,
+    systemBoundaries: session.systemBoundaries,
     connections: session.connections,
     nextPlacementId: session.nextPlacementId,
     nextSwimlaneId: session.nextSwimlaneId,
+    nextSystemBoundaryId: session.nextSystemBoundaryId,
     nextConnectionId: session.nextConnectionId
   });
   const stored = session.diagramStates.get(nextViewType);
   session.viewType = nextViewType;
   session.placements = stored?.placements || [];
   session.swimlanes = stored?.swimlanes || [];
+  session.systemBoundaries = stored?.systemBoundaries || [];
   session.connections = stored?.connections || [];
   session.nextPlacementId = stored?.nextPlacementId || 0;
   session.nextSwimlaneId = stored?.nextSwimlaneId || 0;
+  session.nextSystemBoundaryId = stored?.nextSystemBoundaryId || 0;
   session.nextConnectionId = stored?.nextConnectionId || 0;
   session.selectedPlacementId = null;
   session.selectedSwimlaneId = null;
+  session.selectedSystemBoundaryId = null;
   session.editingConnectionId = null;
   renderDiagramBuilderWorkspace(session);
   session.palette.scrollLeft = 0;
@@ -4425,9 +4556,11 @@ function openDiagramBuilderMode(file) {
     pieces: [],
     placements: [],
     swimlanes: [],
+    systemBoundaries: [],
     connections: [],
     nextPlacementId: 0,
     nextSwimlaneId: 0,
+    nextSystemBoundaryId: 0,
     nextConnectionId: 0,
     cellWidth: DIAGRAM_BUILDER_DEFAULT_CELL_WIDTH,
     cellHeight: DIAGRAM_BUILDER_DEFAULT_CELL_HEIGHT,
@@ -4435,6 +4568,7 @@ function openDiagramBuilderMode(file) {
     codeZoom: 1,
     selectedPlacementId: null,
     selectedSwimlaneId: null,
+    selectedSystemBoundaryId: null,
     armedPieceIndex: null,
     paletteDragging: false,
     previewCell: null,
@@ -4592,7 +4726,14 @@ function openDiagramBuilderMode(file) {
       closeDiagramBuilderMode();
       return;
     }
-    if (event.key !== "Delete" || !session.selectedPlacementId) return;
+    if (event.key !== "Delete") return;
+    if (session.selectedSystemBoundaryId) {
+      session.systemBoundaries = session.systemBoundaries.filter((boundary) => boundary.id !== session.selectedSystemBoundaryId);
+      session.selectedSystemBoundaryId = null;
+      renderDiagramBuilderWorkspace(session);
+      return;
+    }
+    if (!session.selectedPlacementId) return;
     const placements = session.placements;
     const placementIndex = placements.findIndex((placement) => placement.id === session.selectedPlacementId);
     if (placementIndex < 0) return;
