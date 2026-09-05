@@ -1224,6 +1224,31 @@ body.folder-tree-resizing {
   white-space: nowrap;
 }
 
+.diagram-builder-piece.activity-pin,
+.diagram-builder-palette-item.activity-pin {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-color: #9fb2c9;
+  border-radius: 2px;
+  background: #101722;
+}
+
+.diagram-builder-palette-item.activity-pin {
+  width: 46px;
+  min-width: 46px;
+  max-width: 46px;
+  min-height: 46px;
+}
+
+.diagram-builder-piece.activity-pin .diagram-builder-piece-label,
+.diagram-builder-palette-item.activity-pin .diagram-builder-piece-label {
+  width: auto;
+  color: #e7edf6;
+  font-size: 8px;
+  text-align: center;
+}
+
 .diagram-builder-palette-wrap.trash-active {
   background: rgba(52, 8, 18, 0.96);
 }
@@ -3597,6 +3622,76 @@ body.folder-tree-resizing {
   stroke: #c77dff;
   stroke-width: 3px;
   filter: drop-shadow(0 0 5px rgba(199, 125, 255, 0.72));
+}
+
+.diagram-builder-connection-group.pin-drop-target .diagram-builder-connector {
+  stroke: #4de1ff;
+  stroke-width: 4px;
+  filter: drop-shadow(0 0 7px rgba(77, 225, 255, 0.8));
+}
+
+.diagram-builder-connection-pin {
+  cursor: grab;
+  pointer-events: all;
+}
+
+.diagram-builder-connection-pin:active {
+  cursor: grabbing;
+}
+
+.diagram-builder-connection-pin rect {
+  fill: #101722;
+  stroke: #d7e1ef;
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+  transition: fill 120ms ease, stroke 120ms ease, filter 120ms ease;
+}
+
+.diagram-builder-connection-pin text {
+  pointer-events: none;
+  fill: #f2f5fa;
+  font: 700 7px/1 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.diagram-builder-connection-pin:hover rect,
+.diagram-builder-connection-pin:focus-visible rect,
+.diagram-builder-connection-pin.selected rect {
+  fill: #24152d;
+  stroke: #c77dff;
+  filter: drop-shadow(0 0 5px rgba(199, 125, 255, 0.72));
+}
+
+.diagram-builder-connection-pin:focus-visible {
+  outline: none;
+}
+
+.diagram-builder-pin-editor {
+  position: fixed;
+  z-index: 1070;
+  width: 172px;
+  padding: 7px;
+  border: 1px solid #c77dff;
+  border-radius: 6px;
+  background: #17101f;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.58);
+  transform: translate(-50%, 8px);
+}
+
+.diagram-builder-pin-text-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid #705184;
+  border-radius: 4px;
+  color: #f4eaff;
+  background: #0b0911;
+  font: 700 9px/1.25 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.diagram-builder-pin-text-input:focus {
+  border-color: #d7a9fa;
+  outline: none;
 }
 
 .diagram-builder-connector.loop-back {

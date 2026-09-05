@@ -2635,6 +2635,7 @@ function createDiagramBuilderPieces(file, viewType = "activity") {
       diagramBuilderPiece("activity-start", "Start"),
       diagramBuilderPiece("activity-action", "Aktion"),
       diagramBuilderPiece("activity-object", "Objektknoten"),
+      diagramBuilderPiece("activity-pin", "Pin"),
       diagramBuilderPiece("activity-decision", "Entscheidung"),
       diagramBuilderPiece("activity-merge", "Zusammenführung"),
       diagramBuilderPiece("activity-fork", "Fork"),
@@ -2795,6 +2796,7 @@ function diagramBuilderPieceMetrics(piece) {
     "activity-fork": [112, 12],
     "activity-join": [112, 12],
     "activity-flow-final": [30, 30],
+    "activity-pin": [26, 26],
     "activity-object": [140, 54],
     "activity-send-signal": [124, 58],
     "activity-accept-event": [124, 58],
@@ -3040,6 +3042,17 @@ function updateDiagramBuilderCursorPiece(session, clientX, clientY) {
   }
   const floatingPreview = session.overlay.querySelector(".diagram-builder-floating-cursor");
   if (floatingPreview) floatingPreview.hidden = true;
+  if (piece.kind === "activity-pin") {
+    const surfaceRect = session.surface.getBoundingClientRect();
+    const zoom = session.gridZoom || 1;
+    const anchor = findNearestDiagramBuilderConnectionAnchor(session, clientX, clientY);
+    preview.style.left = `${(clientX - surfaceRect.left) / zoom - session.cellWidth / 2}px`;
+    preview.style.top = `${(clientY - surfaceRect.top) / zoom - session.cellHeight / 2}px`;
+    applyDiagramBuilderPlacementSpan(session, piece, preview);
+    preview.classList.toggle("invalid", !anchor);
+    highlightDiagramBuilderPinDropTarget(session, anchor?.connectionId ?? null);
+    return;
+  }
   preview.style.left = `${cell.column * session.cellWidth}px`;
   preview.style.top = `${cell.row * session.cellHeight}px`;
   applyDiagramBuilderPlacementSpan(session, piece, preview);
@@ -3095,13 +3108,15 @@ function beginDiagramBuilderPaletteDrag(session, pieceIndex, button, event) {
       session.surface.classList.add("placing-piece");
       button.classList.add("placement-active");
       button.setAttribute("aria-pressed", "true");
-      setDiagramBuilderStatus(session, `„${session.pieces[pieceIndex].paletteLabel}“ aufgenommen – im Raster loslassen.`, "placing");
+      const targetHint = session.pieces[pieceIndex].kind === "activity-pin" ? "auf einem Pfeil" : "im Raster";
+      setDiagramBuilderStatus(session, `„${session.pieces[pieceIndex].paletteLabel}“ aufgenommen – ${targetHint} loslassen.`, "placing");
     }
     const surfaceRect = session.surface.getBoundingClientRect();
     const overSurface = moveEvent.clientX >= surfaceRect.left && moveEvent.clientX <= surfaceRect.right
       && moveEvent.clientY >= surfaceRect.top && moveEvent.clientY <= surfaceRect.bottom;
     if (overSurface) updateDiagramBuilderCursorPiece(session, moveEvent.clientX, moveEvent.clientY);
     else {
+      highlightDiagramBuilderPinDropTarget(session, null);
       session.surface.querySelector(".diagram-builder-cursor-piece")?.remove();
       updateDiagramBuilderFloatingCursor(session, moveEvent.clientX, moveEvent.clientY);
     }
@@ -3120,7 +3135,19 @@ function beginDiagramBuilderPaletteDrag(session, pieceIndex, button, event) {
     const overSurface = !cancelled && finishEvent.clientX >= surfaceRect.left && finishEvent.clientX <= surfaceRect.right
       && finishEvent.clientY >= surfaceRect.top && finishEvent.clientY <= surfaceRect.bottom;
     const targetCell = overSurface ? diagramBuilderCellFromPoint(session, finishEvent.clientX, finishEvent.clientY) : null;
+    const pinAnchor = overSurface && piece?.kind === "activity-pin"
+      ? findNearestDiagramBuilderConnectionAnchor(session, finishEvent.clientX, finishEvent.clientY)
+      : null;
     clearDiagramBuilderPlacementMode(session);
+    highlightDiagramBuilderPinDropTarget(session, null);
+    if (piece?.kind === "activity-pin") {
+      if (!pinAnchor) {
+        setDiagramBuilderStatus(session, "Der Pin wurde nicht platziert. Ziehe ihn direkt auf einen Pfeil.", "error");
+        return;
+      }
+      addDiagramBuilderConnectionPin(session, pinAnchor);
+      return;
+    }
     if (!piece || !targetCell) {
       setDiagramBuilderStatus(session, "Baustein wurde nicht platziert und ist in die Leiste zurückgekehrt.");
       return;
@@ -4048,7 +4075,9 @@ function renderDiagramBuilderPalette(session) {
       applyDiagramBuilderPieceMetrics(button, { ...piece, label: piece.paletteLabel });
     }
     appendDiagramBuilderPieceContent(button, piece, piece.paletteLabel);
-    button.title = `${piece.paletteLabel} halten und ins Raster ziehen`;
+    button.title = piece.kind === "activity-pin"
+      ? "Pin halten und auf einen Pfeil ziehen"
+      : `${piece.paletteLabel} halten und ins Raster ziehen`;
     button.setAttribute("aria-label", piece.paletteLabel);
     button.setAttribute("aria-pressed", String(session.armedPieceIndex === index));
     if (session.armedPieceIndex === index) button.classList.add("placement-active");
@@ -4311,6 +4340,8 @@ function confirmDiagramBuilderDeletion(session) {
   session.toast.hidden = true;
   session.placements = session.placements.filter((placement) => placement.id !== placementId);
   session.connections = session.connections.filter((connection) => connection.sourceId !== placementId && connection.targetId !== placementId);
+  const remainingConnectionIds = new Set(session.connections.map((connection) => connection.id));
+  session.pins = session.pins.filter((pin) => remainingConnectionIds.has(pin.connectionId));
   if (session.selectedPlacementId === placementId) session.selectedPlacementId = null;
   renderDiagramBuilderWorkspace(session);
   setDiagramBuilderStatus(session, "Element und seine Verbindungen wurden gelöscht.", "success");
@@ -4338,6 +4369,200 @@ function diagramBuilderCompactOrthogonalPath(points) {
 function diagramBuilderPathSegments(points) {
   const compactPoints = diagramBuilderCompactOrthogonalPath(points);
   return compactPoints.slice(1).map((point, index) => ({ from: compactPoints[index], to: point }));
+}
+
+function diagramBuilderPointOnRoute(route, fraction = 0.5) {
+  const segments = route?.segments || [];
+  const lengths = segments.map((segment) => Math.abs(segment.to.x - segment.from.x) + Math.abs(segment.to.y - segment.from.y));
+  const totalLength = lengths.reduce((sum, length) => sum + length, 0);
+  if (!segments.length || totalLength <= 0) return route?.points?.[0] || { x: 0, y: 0 };
+  let remaining = Math.max(0, Math.min(1, fraction)) * totalLength;
+  for (let index = 0; index < segments.length; index += 1) {
+    const segment = segments[index];
+    const length = lengths[index];
+    if (remaining > length && index < segments.length - 1) {
+      remaining -= length;
+      continue;
+    }
+    const ratio = length ? remaining / length : 0;
+    return {
+      x: segment.from.x + (segment.to.x - segment.from.x) * ratio,
+      y: segment.from.y + (segment.to.y - segment.from.y) * ratio
+    };
+  }
+  return segments[segments.length - 1].to;
+}
+
+function findNearestDiagramBuilderConnectionAnchor(session, clientX, clientY, maximumDistance = 22) {
+  const surfaceRect = session.surface.getBoundingClientRect();
+  const zoom = session.gridZoom || 1;
+  const point = {
+    x: (clientX - surfaceRect.left) / zoom,
+    y: (clientY - surfaceRect.top) / zoom
+  };
+  let nearest = null;
+  session.connectionRoutes?.forEach((route, connectionId) => {
+    const segmentLengths = route.segments.map((segment) => Math.abs(segment.to.x - segment.from.x) + Math.abs(segment.to.y - segment.from.y));
+    const totalLength = segmentLengths.reduce((sum, length) => sum + length, 0);
+    let traversed = 0;
+    route.segments.forEach((segment, index) => {
+      const vertical = segment.from.x === segment.to.x;
+      const minimumX = Math.min(segment.from.x, segment.to.x);
+      const maximumX = Math.max(segment.from.x, segment.to.x);
+      const minimumY = Math.min(segment.from.y, segment.to.y);
+      const maximumY = Math.max(segment.from.y, segment.to.y);
+      const projected = vertical
+        ? { x: segment.from.x, y: Math.max(minimumY, Math.min(maximumY, point.y)) }
+        : { x: Math.max(minimumX, Math.min(maximumX, point.x)), y: segment.from.y };
+      const distance = Math.hypot(point.x - projected.x, point.y - projected.y);
+      const offset = vertical ? Math.abs(projected.y - segment.from.y) : Math.abs(projected.x - segment.from.x);
+      const fraction = totalLength ? (traversed + offset) / totalLength : 0.5;
+      if (!nearest || distance < nearest.distance) nearest = { connectionId, fraction, point: projected, distance };
+      traversed += segmentLengths[index];
+    });
+  });
+  return nearest && nearest.distance <= maximumDistance / zoom ? nearest : null;
+}
+
+function highlightDiagramBuilderPinDropTarget(session, connectionId) {
+  session.connectorLayer?.querySelectorAll(".diagram-builder-connection-group.pin-drop-target").forEach((group) => {
+    group.classList.remove("pin-drop-target");
+  });
+  if (connectionId !== null && connectionId !== undefined) {
+    session.connectorLayer?.querySelector(`[data-connection-id="${connectionId}"]`)?.classList.add("pin-drop-target");
+  }
+}
+
+function addDiagramBuilderConnectionPin(session, anchor) {
+  const pin = {
+    id: ++session.nextPinId,
+    connectionId: anchor.connectionId,
+    fraction: Math.max(0.08, Math.min(0.92, anchor.fraction)),
+    label: ""
+  };
+  session.pins.push(pin);
+  session.selectedPinId = pin.id;
+  drawDiagramBuilderConnections(session);
+  setDiagramBuilderStatus(session, "Pin ist am Pfeil eingerastet. Doppelklick zum Beschriften.", "success");
+}
+
+function beginDiagramBuilderPinEdit(session, pin, clientX, clientY) {
+  session.finishEditing?.(true);
+  session.finishConnectionEditing?.(true);
+  session.finishPinEditing?.(true);
+  const originalLabel = pin.label || "";
+  const editor = createElement("div", "diagram-builder-pin-editor");
+  editor.style.left = `${Math.max(86, Math.min(window.innerWidth - 86, clientX))}px`;
+  editor.style.top = `${Math.max(28, Math.min(window.innerHeight - 28, clientY))}px`;
+  const input = createElement("input", "diagram-builder-pin-text-input");
+  input.type = "text";
+  input.value = originalLabel;
+  input.placeholder = "z. B. PW & Code";
+  input.setAttribute("aria-label", "Beschriftung des Pins bearbeiten");
+  editor.append(input);
+  session.overlay.append(editor);
+  session.editingPinId = pin.id;
+  let finished = false;
+  session.finishPinEditing = (save) => {
+    if (finished) return;
+    finished = true;
+    pin.label = save ? input.value.trim() : originalLabel;
+    editor.remove();
+    session.editingPinId = null;
+    session.finishPinEditing = null;
+    drawDiagramBuilderConnections(session);
+    setDiagramBuilderStatus(session, save ? "Pin-Beschriftung übernommen." : "Pin-Bearbeitung abgebrochen.", save ? "success" : "");
+  };
+  editor.addEventListener("focusout", () => window.setTimeout(() => {
+    if (!editor.contains(document.activeElement)) session.finishPinEditing?.(true);
+  }, 0));
+  input.focus({ preventScroll: true });
+  input.select();
+}
+
+function renderDiagramBuilderConnectionPins(session, connection, route, connectionGroup) {
+  session.pins.filter((pin) => pin.connectionId === connection.id).forEach((pin) => {
+    const point = diagramBuilderPointOnRoute(route, pin.fraction);
+    const pinSize = Math.max(24, Math.min(52, (pin.label?.length || 0) * 5 + 10));
+    const pinGroup = createSvgElement("g", {
+      class: `diagram-builder-connection-pin${pin.id === session.selectedPinId ? " selected" : ""}`,
+      "data-pin-id": pin.id,
+      transform: `translate(${point.x} ${point.y})`,
+      role: "button",
+      tabindex: 0,
+      "aria-label": `${pin.label || "Unbeschrifteter Pin"}; Doppelklick zum Bearbeiten`
+    });
+    pinGroup.append(createSvgElement("rect", {
+      x: -pinSize / 2,
+      y: -pinSize / 2,
+      width: pinSize,
+      height: pinSize,
+      rx: 1
+    }));
+    if (pin.label) {
+      const text = createSvgElement("text", { x: 0, y: 3, "text-anchor": "middle" });
+      text.textContent = pin.label;
+      pinGroup.append(text);
+    }
+    pinGroup.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      session.selectedPinId = pin.id;
+      session.selectedPlacementId = null;
+      session.selectedSwimlaneId = null;
+      session.selectedSystemBoundaryId = null;
+      session.selectedSequenceFragmentId = null;
+      session.connectorLayer.querySelectorAll(".diagram-builder-connection-pin.selected").forEach((item) => item.classList.remove("selected"));
+      session.surface.querySelectorAll(".diagram-builder-piece.selected, .diagram-builder-swimlane.selected, .diagram-builder-system-boundary.selected, .diagram-builder-sequence-fragment-frame.selected").forEach((item) => item.classList.remove("selected"));
+      pinGroup.classList.add("selected");
+    });
+    pinGroup.addEventListener("dblclick", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      session.selectedPinId = pin.id;
+      beginDiagramBuilderPinEdit(session, pin, event.clientX, event.clientY);
+    });
+    let drag = null;
+    const move = (event) => {
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      if (!drag.active && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 6) return;
+      event.preventDefault();
+      drag.active = true;
+      const anchor = findNearestDiagramBuilderConnectionAnchor(session, event.clientX, event.clientY, 34);
+      drag.anchor = anchor;
+      highlightDiagramBuilderPinDropTarget(session, anchor?.connectionId ?? null);
+      if (anchor) pinGroup.setAttribute("transform", `translate(${anchor.point.x} ${anchor.point.y})`);
+    };
+    const finish = (event, cancelled = false) => {
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      const currentDrag = drag;
+      drag = null;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", cancel);
+      highlightDiagramBuilderPinDropTarget(session, null);
+      if (!currentDrag.active) return;
+      if (currentDrag.active && !cancelled && currentDrag.anchor) {
+        pin.connectionId = currentDrag.anchor.connectionId;
+        pin.fraction = Math.max(0.08, Math.min(0.92, currentDrag.anchor.fraction));
+        setDiagramBuilderStatus(session, "Pin wurde am Pfeil neu positioniert.", "success");
+      } else {
+        setDiagramBuilderStatus(session, "Pin ist an seiner bisherigen Position geblieben.");
+      }
+      drawDiagramBuilderConnections(session);
+    };
+    const cancel = (event) => finish(event, true);
+    pinGroup.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      drag = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, active: false, anchor: null };
+      window.addEventListener("pointermove", move, { passive: false });
+      window.addEventListener("pointerup", finish);
+      window.addEventListener("pointercancel", cancel);
+    });
+    connectionGroup.append(pinGroup);
+  });
 }
 
 function diagramBuilderSegmentsIntersect(left, right) {
@@ -4799,6 +5024,7 @@ function drawDiagramBuilderConnections(session) {
   if (!layer) return;
   session.overlay.querySelectorAll(".diagram-builder-endpoint-control, .diagram-builder-endpoint-menu").forEach((item) => item.remove());
   layer.replaceChildren();
+  session.connectionRoutes = new Map();
   const width = session.surface.clientWidth;
   const height = session.surface.clientHeight;
   layer.setAttribute("viewBox", `0 0 ${width} ${height}`);
@@ -5067,6 +5293,7 @@ function drawDiagramBuilderConnections(session) {
     });
     routeCandidates.sort((left, right) => Number(left.invalid) - Number(right.invalid) || left.score - right.score);
     const route = routeCandidates[0];
+    session.connectionRoutes.set(connection.id, route);
     routedSegments.push(...route.segments);
     const pathData = route.points
       .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
@@ -5112,6 +5339,7 @@ function drawDiagramBuilderConnections(session) {
     });
     connectionGroup.append(hitPath, path);
     layer.append(connectionGroup);
+    renderDiagramBuilderConnectionPins(session, connection, route, connectionGroup);
     const visibleConnectionLabel = isUseCaseDependency
       ? `«${connection.useCaseRelation}»${connection.label ? ` ${connection.label}` : ""}`
       : connection.label;
@@ -5183,6 +5411,7 @@ function createDiagramBuilderPlacedNode(session, placement) {
       return;
     }
     session.selectedPlacementId = placement.id;
+    session.selectedPinId = null;
     session.selectedSwimlaneId = null;
     session.selectedSystemBoundaryId = null;
     session.selectedSequenceFragmentId = null;
@@ -6079,6 +6308,7 @@ function switchDiagramBuilderView(session, nextViewType) {
   session.finishSwimlaneEditing?.(true);
   session.finishSystemBoundaryEditing?.(true);
   session.finishSequenceFragmentEditing?.(true);
+  session.finishPinEditing?.(true);
   clearDiagramBuilderPlacementMode(session);
   clearDiagramBuilderConnectionMode(session);
   session.diagramStates.set(session.viewType, {
@@ -6087,11 +6317,13 @@ function switchDiagramBuilderView(session, nextViewType) {
     systemBoundaries: session.systemBoundaries,
     sequenceFragments: session.sequenceFragments,
     connections: session.connections,
+    pins: session.pins,
     nextPlacementId: session.nextPlacementId,
     nextSwimlaneId: session.nextSwimlaneId,
     nextSystemBoundaryId: session.nextSystemBoundaryId,
     nextSequenceFragmentId: session.nextSequenceFragmentId,
-    nextConnectionId: session.nextConnectionId
+    nextConnectionId: session.nextConnectionId,
+    nextPinId: session.nextPinId
   });
   const stored = session.diagramStates.get(nextViewType);
   session.viewType = nextViewType;
@@ -6100,11 +6332,13 @@ function switchDiagramBuilderView(session, nextViewType) {
   session.systemBoundaries = stored?.systemBoundaries || [];
   session.sequenceFragments = stored?.sequenceFragments || [];
   session.connections = stored?.connections || [];
+  session.pins = stored?.pins || [];
   session.nextPlacementId = stored?.nextPlacementId || 0;
   session.nextSwimlaneId = stored?.nextSwimlaneId || 0;
   session.nextSystemBoundaryId = stored?.nextSystemBoundaryId || 0;
   session.nextSequenceFragmentId = stored?.nextSequenceFragmentId || 0;
   session.nextConnectionId = stored?.nextConnectionId || 0;
+  session.nextPinId = stored?.nextPinId || 0;
   session.viewButtons?.forEach((button) => {
     const isActive = button.dataset.viewType === nextViewType;
     button.classList.toggle("active", isActive);
@@ -6115,6 +6349,8 @@ function switchDiagramBuilderView(session, nextViewType) {
   session.selectedSystemBoundaryId = null;
   session.selectedSequenceFragmentId = null;
   session.editingConnectionId = null;
+  session.selectedPinId = null;
+  session.editingPinId = null;
   renderDiagramBuilderWorkspace(session);
   session.palette.scrollLeft = 0;
   setDiagramBuilderStatus(session, `${UML_VIEWS[nextViewType]} ausgewählt. Baustein halten und ins Raster ziehen.`, "success");
@@ -6169,6 +6405,7 @@ function closeDiagramBuilderMode() {
   if (!activeDiagramBuilderSession) return;
   activeDiagramBuilderSession.finishSystemBoundaryEditing?.(true);
   activeDiagramBuilderSession.finishSequenceFragmentEditing?.(true);
+  activeDiagramBuilderSession.finishPinEditing?.(true);
   document.removeEventListener("keydown", activeDiagramBuilderSession.handleKeyDown, true);
   activeDiagramBuilderSession.resizeObserver?.disconnect();
   activeDiagramBuilderSession.overlay.remove();
@@ -6260,11 +6497,13 @@ function openDiagramBuilderMode(file) {
     systemBoundaries: [],
     sequenceFragments: [],
     connections: [],
+    pins: [],
     nextPlacementId: 0,
     nextSwimlaneId: 0,
     nextSystemBoundaryId: 0,
     nextSequenceFragmentId: 0,
     nextConnectionId: 0,
+    nextPinId: 0,
     cellWidth: DIAGRAM_BUILDER_DEFAULT_CELL_WIDTH,
     cellHeight: DIAGRAM_BUILDER_DEFAULT_CELL_HEIGHT,
     gridZoom: 1,
@@ -6286,6 +6525,9 @@ function openDiagramBuilderMode(file) {
     finishEditing: null,
     editingConnectionId: null,
     finishConnectionEditing: null,
+    selectedPinId: null,
+    editingPinId: null,
+    finishPinEditing: null,
     editingSwimlaneId: null,
     finishSwimlaneEditing: null,
     editingSystemBoundaryId: null,
@@ -6415,6 +6657,13 @@ function openDiagramBuilderMode(file) {
       session.finishConnectionEditing?.(event.key === "Enter");
       return;
     }
+    if (session.editingPinId) {
+      if (event.key !== "Enter" && event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      session.finishPinEditing?.(event.key === "Enter");
+      return;
+    }
     if (session.editingSwimlaneId) {
       if (event.key !== "Enter" && event.key !== "Escape") return;
       event.preventDefault();
@@ -6452,6 +6701,13 @@ function openDiagramBuilderMode(file) {
       return;
     }
     if (event.key !== "Delete") return;
+    if (session.selectedPinId) {
+      session.pins = session.pins.filter((pin) => pin.id !== session.selectedPinId);
+      session.selectedPinId = null;
+      drawDiagramBuilderConnections(session);
+      setDiagramBuilderStatus(session, "Pin wurde gelöscht.", "success");
+      return;
+    }
     if (session.selectedSwimlaneId) {
       session.swimlanes = session.swimlanes.filter((swimlane) => swimlane.id !== session.selectedSwimlaneId);
       session.selectedSwimlaneId = null;
@@ -6476,6 +6732,8 @@ function openDiagramBuilderMode(file) {
     if (placementIndex < 0) return;
     placements.splice(placementIndex, 1);
     session.connections = session.connections.filter((connection) => connection.sourceId !== session.selectedPlacementId && connection.targetId !== session.selectedPlacementId);
+    const remainingConnectionIds = new Set(session.connections.map((connection) => connection.id));
+    session.pins = session.pins.filter((pin) => remainingConnectionIds.has(pin.connectionId));
     session.selectedPlacementId = null;
     renderDiagramBuilderWorkspace(session);
   };
