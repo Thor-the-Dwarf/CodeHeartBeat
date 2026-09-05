@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeHeartBeat</title>
+  <link rel="stylesheet" href="styles.css?v=20260905-0061">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <button id="folder-tree-toggle" class="folder-tree-toggle" type="button" aria-label="FolderTree zuklappen" aria-expanded="true" aria-controls="folder-tree-panel">
+        <span class="folder-button-icon" aria-hidden="true"></span>
+      </button>
+      <div class="brand-mark" aria-hidden="true">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+      <div>
+        <p class="eyebrow">Runtime-Visualisierung</p>
+        <h1>CodeHeartBeat</h1>
+      </div>
+      <div class="topbar-actions">
+        <label class="view-selector global-view-selector">
+          <span>Alle Ansichten</span>
+          <select id="global-view-select" aria-label="Diagrammart für alle Dateien">
+            <option value="class">Klassendiagramm</option>
+            <option value="state">Zustandsdiagramm</option>
+            <option value="usecase">Use-Case-Diagramm</option>
+            <option value="activity">Aktivitätsdiagramm</option>
+            <option value="sequence">Sequenzdiagramm</option>
+            <option value="nassi">Nassi-Shneiderman-Diagramm</option>
+            <option value="pap">Programmablaufplan (PAP)</option>
+            <option value="pseudocode">Pseudocode</option>
+          </select>
+        </label>
+        <div class="status-pill">
+          <span class="status-dot"></span>
+          Lokal verbunden
+        </div>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside id="folder-tree-panel" class="folder-tree-panel" aria-label="FolderTree">
+        <div class="folder-tree-heading">
+          <span class="folder-button-icon" aria-hidden="true"></span>
+          <strong>FolderTree</strong>
+        </div>
+        <nav id="folder-tree" class="folder-tree" aria-label="Dateien und Ordner"></nav>
+      </aside>
+      <div id="folder-tree-resizer" class="folder-tree-resizer" role="separator" aria-label="Breite des FolderTrees ändern" aria-controls="folder-tree-panel" aria-orientation="vertical" aria-valuemin="180" aria-valuenow="250" tabindex="0"></div>
+      <section class="diagram-panel">
+        <div class="diagram-toolbar">
+          <div class="diagram-title">
+            <span class="diagram-mark" aria-hidden="true">◇</span>
+            <span>Architektur-Diagramm</span>
+          </div>
+          <span id="diagram-summary" class="diagram-summary">Struktur wird aufgebaut</span>
+        </div>
+        <div class="diagram-viewport">
+          <div id="architecture-diagram" class="architecture-diagram" aria-label="Architektur des FolderTree"></div>
+        </div>
+      </section>
+    </main>
+
+    <section id="runtime-terminal" class="runtime-terminal" aria-label="Java-Terminal" hidden>
+      <div class="terminal-toolbar">
+        <div class="terminal-title">
+          <span class="terminal-prompt-icon" aria-hidden="true">›_</span>
+          <strong>Terminal</strong>
+          <span id="terminal-file-name"></span>
+        </div>
+        <button id="terminal-close" class="terminal-close" type="button" aria-label="Terminal schließen">×</button>
+      </div>
+      <div id="terminal-output" class="terminal-output" role="log" aria-live="polite"></div>
+    </section>
+
+    <footer class="statusbar">
+      <span>Java</span>
+      <span>UTF-8</span>
+      <span id="structure-summary">Projektstruktur wird geladen</span>
+    </footer>
+  </div>
+  <script src="folder-data.js?v=20260905-0061"></script>
+  <script src="app.js?v=20260905-0061"></script>
+</body>
+</html>

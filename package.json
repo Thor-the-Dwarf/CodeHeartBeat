@@ -1,0 +1,10 @@
+{
+  "name": "code-heart-beat",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lokale Code-Visualisierung mit dynamischem FolderTree",
+  "scripts": {
+    "build:data": "node scripts/generate-folder-data.js",
+    "start": "node server.js"
+  }
+}
