@@ -2189,22 +2189,6 @@ body.folder-tree-resizing {
   transform: translateX(-50%);
 }
 
-.diagram-builder-piece.activity-send-signal,
-.diagram-builder-palette-item.activity-send-signal {
-  border: 0;
-  border-radius: 0;
-  background: #7c6330;
-  clip-path: polygon(0 0, 78% 0, 100% 50%, 78% 100%, 0 100%);
-}
-
-.diagram-builder-piece.activity-accept-event,
-.diagram-builder-palette-item.activity-accept-event {
-  border: 0;
-  border-radius: 0;
-  background: #52687a;
-  clip-path: polygon(0 0, 100% 0, 78% 50%, 100% 100%, 0 100%, 22% 50%);
-}
-
 .diagram-builder-cell-item .diagram-builder-piece.activity-action,
 .diagram-builder-floating-cursor .diagram-builder-piece.activity-action {
   width: var(--builder-piece-width, 112px);
