@@ -3402,6 +3402,24 @@ function drawDiagramBuilderConnections(session) {
   });
   marker.append(createSvgElement("path", { d: "M 0 0 L 8 4 L 0 8 z", fill: "context-stroke" }));
   definitions.append(marker);
+  const activityMarker = createSvgElement("marker", {
+    id: "diagram-builder-activity-arrowhead",
+    markerWidth: 8,
+    markerHeight: 8,
+    refX: 7,
+    refY: 4,
+    orient: "auto-start-reverse",
+    markerUnits: "strokeWidth"
+  });
+  activityMarker.append(createSvgElement("path", {
+    d: "M 1 1 L 7 4 L 1 7",
+    fill: "none",
+    stroke: "context-stroke",
+    "stroke-width": 1.5,
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round"
+  }));
+  definitions.append(activityMarker);
   const inheritanceMarker = createSvgElement("marker", {
     id: "diagram-builder-inheritance",
     markerWidth: 12,
@@ -3578,7 +3596,9 @@ function drawDiagramBuilderConnections(session) {
       d: pathData
     };
     const markerUrl = (markerType) => ({
-      control: "url(#diagram-builder-arrowhead)",
+      control: session.viewType === "activity"
+        ? "url(#diagram-builder-activity-arrowhead)"
+        : "url(#diagram-builder-arrowhead)",
       inheritance: "url(#diagram-builder-inheritance)",
       aggregation: "url(#diagram-builder-aggregation)",
       composition: "url(#diagram-builder-composition)"
