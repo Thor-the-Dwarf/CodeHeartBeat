@@ -1995,6 +1995,7 @@ body.folder-tree-resizing {
 
 /* Gemeinsame Zeichenlogik, aber diagrammspezifische Standardformen. */
 .diagram-builder-cell-item .diagram-builder-piece.class-box,
+.diagram-builder-cell-item .diagram-builder-piece.class-abstract,
 .diagram-builder-cell-item .diagram-builder-piece.class-interface,
 .diagram-builder-cell-item .diagram-builder-piece.class-enum,
 .diagram-builder-cell-item .diagram-builder-piece.class-package,
@@ -2009,9 +2010,11 @@ body.folder-tree-resizing {
 }
 
 .diagram-builder-piece.class-box,
+.diagram-builder-piece.class-abstract,
 .diagram-builder-piece.class-interface,
 .diagram-builder-piece.class-enum,
 .diagram-builder-palette-item.class-box,
+.diagram-builder-palette-item.class-abstract,
 .diagram-builder-palette-item.class-interface,
 .diagram-builder-palette-item.class-enum {
   border-radius: 0;
@@ -2020,6 +2023,7 @@ body.folder-tree-resizing {
 }
 
 .diagram-builder-palette-item.class-box,
+.diagram-builder-palette-item.class-abstract,
 .diagram-builder-palette-item.class-interface,
 .diagram-builder-palette-item.class-enum {
   background:
@@ -2034,6 +2038,7 @@ body.folder-tree-resizing {
     #172231;
 }
 
+.diagram-builder-piece.class-abstract::before,
 .diagram-builder-piece.class-interface::before,
 .diagram-builder-piece.class-enum::before {
   position: absolute;
@@ -2044,6 +2049,10 @@ body.folder-tree-resizing {
   content: "«interface»";
   font: 600 7px/1 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
   text-align: center;
+}
+
+.diagram-builder-piece.class-abstract::before {
+  content: "«abstract»";
 }
 
 .diagram-builder-piece.class-enum::before {
@@ -2070,10 +2079,15 @@ body.folder-tree-resizing {
   text-align: center;
 }
 
+.diagram-builder-piece.class-abstract .diagram-builder-classifier-name,
 .diagram-builder-piece.class-interface .diagram-builder-classifier-name,
 .diagram-builder-piece.class-enum .diagram-builder-classifier-name {
   min-height: 50px;
   padding-top: 22px;
+}
+
+.diagram-builder-piece.class-abstract .diagram-builder-classifier-name {
+  font-style: italic;
 }
 
 .diagram-builder-classifier-section {
@@ -2127,10 +2141,15 @@ body.folder-tree-resizing {
   text-align: center;
 }
 
+.diagram-builder-piece.class-abstract .diagram-builder-classifier-name-input,
 .diagram-builder-piece.class-interface .diagram-builder-classifier-name-input,
 .diagram-builder-piece.class-enum .diagram-builder-classifier-name-input {
   min-height: 50px;
   padding-top: 20px;
+}
+
+.diagram-builder-piece.class-abstract .diagram-builder-classifier-name-input {
+  font-style: italic;
 }
 
 .diagram-builder-classifier-editor-section {

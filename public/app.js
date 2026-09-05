@@ -2608,13 +2608,14 @@ function diagramBuilderIsSequenceParticipant(piece) {
 }
 
 function diagramBuilderIsClassifier(piece) {
-  return ["class-box", "class-interface", "class-enum"].includes(piece?.kind);
+  return ["class-box", "class-abstract", "class-interface", "class-enum"].includes(piece?.kind);
 }
 
 function createDiagramBuilderPieces(file, viewType = "activity") {
   const piecesByView = {
     class: [
       diagramBuilderPiece("class-box", "Klasse"),
+      diagramBuilderPiece("class-abstract", "Abstrakte Klasse"),
       diagramBuilderPiece("class-interface", "Interface"),
       diagramBuilderPiece("class-enum", "Enumeration"),
       diagramBuilderPiece("class-package", "Paket")
@@ -3100,7 +3101,13 @@ function beginDiagramBuilderClassifierEdit(session, placement, node) {
   const nameInput = createElement("input", "diagram-builder-classifier-name-input");
   nameInput.type = "text";
   nameInput.value = original.label;
-  nameInput.placeholder = piece.kind === "class-interface" ? "Interfacename" : piece.kind === "class-enum" ? "Enumerationsname" : "Klassenname";
+  nameInput.placeholder = piece.kind === "class-interface"
+    ? "Interfacename"
+    : piece.kind === "class-enum"
+      ? "Enumerationsname"
+      : piece.kind === "class-abstract"
+        ? "Name der abstrakten Klasse"
+        : "Klassenname";
   nameInput.setAttribute("aria-label", nameInput.placeholder);
   editor.append(nameInput);
 
