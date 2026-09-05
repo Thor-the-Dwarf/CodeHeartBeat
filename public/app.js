@@ -3997,7 +3997,169 @@ function showDiagramBuilderTrashTarget(session, placement) {
   session.palette.replaceChildren(trash);
 }
 
+function showDiagramBuilderContainerTrashTarget(session) {
+  clearDiagramBuilderPlacementMode(session);
+  clearDiagramBuilderConnectionMode(session);
+  session.paletteWrap.classList.add("trash-active");
+  session.palette.classList.add("trash-mode");
+  session.paletteLabel.textContent = "CONTAINER ENTFERNEN";
+  const trash = createElement("div", "diagram-builder-trash-target");
+  trash.setAttribute("role", "button");
+  trash.setAttribute("aria-label", "Container hier ablegen, um ihn zu löschen");
+  trash.append(createElement("span", "diagram-builder-trash-icon", "🗑"), createElement("strong", "", "Zum Löschen hier ablegen"));
+  session.palette.replaceChildren(trash);
+}
+
+function diagramBuilderContainerNode(session, kind, id) {
+  const selector = {
+    "system-boundary": `[data-system-boundary-id="${id}"]`,
+    "sequence-fragment": `[data-sequence-fragment-id="${id}"]`,
+    swimlane: `[data-swimlane-id="${id}"]`
+  }[kind];
+  return selector ? session.surface.querySelector(selector) : null;
+}
+
+function requestDiagramBuilderContainerDeletion(session, kind, item, node, clientX, clientY, original) {
+  Object.assign(item, original);
+  updateDiagramBuilderGridMetrics(session);
+  if (kind === "system-boundary") applyDiagramBuilderSystemBoundaryGeometry(session, item, node);
+  if (kind === "sequence-fragment") applyDiagramBuilderSequenceFragmentGeometry(session, item, node);
+  if (kind === "swimlane") applyDiagramBuilderSwimlaneGeometry(session, item, node);
+  const sourceRect = node.getBoundingClientRect();
+  node.classList.remove("moving");
+  node.classList.add("awaiting-delete-confirmation");
+  node.style.setProperty("--return-x", `${clientX - (sourceRect.left + sourceRect.width / 2)}px`);
+  node.style.setProperty("--return-y", `${clientY - (sourceRect.top + sourceRect.height / 2)}px`);
+  session.pendingContainerDeletion = { kind, id: item.id };
+  const label = kind === "system-boundary"
+    ? item.label || "Systemgrenze"
+    : kind === "sequence-fragment"
+      ? "Kombiniertes Fragment"
+      : item.label || "Swimlane";
+  session.toastMessage.textContent = `„${label}“ wirklich löschen?`;
+  session.toast.hidden = false;
+  session.toastDeleteButton.focus({ preventScroll: true });
+}
+
+function createDiagramBuilderContainerMoveHandle(session, kind, item, node, options = {}) {
+  const handle = createElement("button", "diagram-builder-container-move-handle", "⠿");
+  handle.type = "button";
+  handle.setAttribute("aria-label", `${options.label || "Container"} verschieben oder löschen`);
+  handle.title = "Ziehen · rastet im Raster ein · auf die rote Fläche ziehen zum Löschen";
+  let drag = null;
+  const applyGeometry = () => {
+    if (kind === "system-boundary") applyDiagramBuilderSystemBoundaryGeometry(session, item, node);
+    if (kind === "sequence-fragment") applyDiagramBuilderSequenceFragmentGeometry(session, item, node);
+    if (kind === "swimlane") applyDiagramBuilderSwimlaneGeometry(session, item, node);
+  };
+  const move = (moveEvent) => {
+    if (!drag || moveEvent.pointerId !== drag.pointerId) return;
+    if (!drag.active && Math.hypot(moveEvent.clientX - drag.startX, moveEvent.clientY - drag.startY) < 6) return;
+    moveEvent.preventDefault();
+    if (!drag.active) {
+      drag.active = true;
+      node.classList.add("moving");
+      showDiagramBuilderContainerTrashTarget(session);
+    }
+    const trash = session.palette.querySelector(".diagram-builder-trash-target");
+    const trashRect = trash?.getBoundingClientRect();
+    const overTrash = Boolean(trashRect
+      && moveEvent.clientX >= trashRect.left && moveEvent.clientX <= trashRect.right
+      && moveEvent.clientY >= trashRect.top && moveEvent.clientY <= trashRect.bottom);
+    trash?.classList.toggle("drag-over", overTrash);
+    if (overTrash) return;
+    const zoom = session.gridZoom || 1;
+    const requestedColumnDelta = Math.round((moveEvent.clientX - drag.startX) / (session.cellWidth * zoom));
+    const requestedRowDelta = options.horizontalOnly
+      ? 0
+      : Math.round((moveEvent.clientY - drag.startY) / (session.cellHeight * zoom));
+    const columnDelta = Math.max(-drag.original.leftColumn, requestedColumnDelta);
+    const rowDelta = "topRow" in drag.original ? Math.max(-drag.original.topRow, requestedRowDelta) : 0;
+    item.leftColumn = drag.original.leftColumn + columnDelta;
+    item.rightColumn = drag.original.rightColumn + columnDelta;
+    if ("topRow" in drag.original) {
+      item.topRow = drag.original.topRow + rowDelta;
+      item.bottomRow = drag.original.bottomRow + rowDelta;
+    }
+    updateDiagramBuilderGridMetrics(session);
+    applyGeometry();
+    setDiagramBuilderStatus(session, `${options.label || "Container"} ist im Raster eingerastet.`, "success");
+  };
+  const finish = (finishEvent, cancelled = false) => {
+    if (!drag || finishEvent.pointerId !== drag.pointerId) return;
+    const currentDrag = drag;
+    drag = null;
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", finish);
+    window.removeEventListener("pointercancel", cancel);
+    if (!currentDrag.active) return;
+    finishEvent.preventDefault();
+    finishEvent.stopPropagation();
+    const trash = session.palette.querySelector(".diagram-builder-trash-target");
+    const trashRect = trash?.getBoundingClientRect();
+    const overTrash = !cancelled && Boolean(trashRect
+      && finishEvent.clientX >= trashRect.left && finishEvent.clientX <= trashRect.right
+      && finishEvent.clientY >= trashRect.top && finishEvent.clientY <= trashRect.bottom);
+    trash?.classList.remove("drag-over");
+    if (overTrash) {
+      requestDiagramBuilderContainerDeletion(session, kind, item, node, finishEvent.clientX, finishEvent.clientY, currentDrag.original);
+      return;
+    }
+    const surfaceRect = session.surface.getBoundingClientRect();
+    const overSurface = !cancelled
+      && finishEvent.clientX >= surfaceRect.left && finishEvent.clientX <= surfaceRect.right
+      && finishEvent.clientY >= surfaceRect.top && finishEvent.clientY <= surfaceRect.bottom;
+    if (!overSurface) {
+      Object.assign(item, currentDrag.original);
+      updateDiagramBuilderGridMetrics(session);
+      applyGeometry();
+      setDiagramBuilderStatus(session, `${options.label || "Container"} ist an seine Ausgangsposition zurückgekehrt.`);
+    }
+    node.classList.remove("moving");
+    renderDiagramBuilderPalette(session);
+  };
+  const cancel = (cancelEvent) => finish(cancelEvent, true);
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    drag = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      original: {
+        leftColumn: item.leftColumn,
+        rightColumn: item.rightColumn,
+        ...("topRow" in item ? { topRow: item.topRow, bottomRow: item.bottomRow } : {})
+      },
+      active: false
+    };
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", cancel);
+  });
+  return handle;
+}
+
 function cancelDiagramBuilderDeletion(session) {
+  if (session.pendingContainerDeletion) {
+    const { kind, id } = session.pendingContainerDeletion;
+    session.pendingContainerDeletion = null;
+    session.toast.hidden = true;
+    const node = diagramBuilderContainerNode(session, kind, id);
+    if (node) {
+      node.classList.remove("awaiting-delete-confirmation");
+      node.classList.add("returning-to-grid");
+      node.addEventListener("animationend", () => {
+        node.classList.remove("returning-to-grid");
+        node.style.removeProperty("--return-x");
+        node.style.removeProperty("--return-y");
+      }, { once: true });
+    }
+    renderDiagramBuilderPalette(session);
+    setDiagramBuilderStatus(session, "Löschen abgebrochen – Container ist an seine Ausgangsposition zurückgekehrt.");
+    return;
+  }
   const placementId = session.pendingDeletionId;
   session.pendingDeletionId = null;
   session.toast.hidden = true;
@@ -4015,6 +4177,30 @@ function cancelDiagramBuilderDeletion(session) {
 }
 
 function confirmDiagramBuilderDeletion(session) {
+  if (session.pendingContainerDeletion) {
+    const { kind, id } = session.pendingContainerDeletion;
+    session.pendingContainerDeletion = null;
+    session.toast.hidden = true;
+    if (kind === "system-boundary") {
+      session.systemBoundaries = session.systemBoundaries.filter((item) => item.id !== id);
+      session.selectedSystemBoundaryId = null;
+      session.editingSystemBoundaryId = null;
+      session.finishSystemBoundaryEditing = null;
+    } else if (kind === "sequence-fragment") {
+      session.sequenceFragments = session.sequenceFragments.filter((item) => item.id !== id);
+      session.selectedSequenceFragmentId = null;
+      session.editingSequenceFragmentId = null;
+      session.finishSequenceFragmentEditing = null;
+    } else if (kind === "swimlane") {
+      session.swimlanes = session.swimlanes.filter((item) => item.id !== id);
+      session.selectedSwimlaneId = null;
+      session.editingSwimlaneId = null;
+      session.finishSwimlaneEditing = null;
+    }
+    renderDiagramBuilderWorkspace(session);
+    setDiagramBuilderStatus(session, "Container wurde gelöscht.", "success");
+    return;
+  }
   const placementId = session.pendingDeletionId;
   session.pendingDeletionId = null;
   session.toast.hidden = true;
@@ -5134,11 +5320,18 @@ function createDiagramBuilderSystemBoundaryNode(session, boundary) {
     editor.addEventListener("dblclick", (event) => event.stopPropagation());
     editor.addEventListener("blur", () => {
       window.setTimeout(() => {
-        if (document.activeElement?.closest?.(".diagram-builder-system-boundary-handle")) return;
+        if (session.pendingContainerDeletion) return;
+        if (document.activeElement?.closest?.(".diagram-builder-system-boundary-handle, .diagram-builder-container-move-handle")) return;
         session.finishSystemBoundaryEditing?.(true);
       }, 0);
     });
-    node.append(editor);
+    node.append(editor, createDiagramBuilderContainerMoveHandle(
+      session,
+      "system-boundary",
+      boundary,
+      node,
+      { label: "Systemgrenze" }
+    ));
   } else {
     const label = createElement(
       "button",
@@ -5387,6 +5580,15 @@ function createDiagramBuilderSequenceFragmentNode(session, fragment) {
     operands.append(operand);
   });
   node.append(operands);
+  if (isEditing) {
+    node.append(createDiagramBuilderContainerMoveHandle(
+      session,
+      "sequence-fragment",
+      fragment,
+      node,
+      { label: "Kombiniertes Fragment" }
+    ));
+  }
   node.append(
     createDiagramBuilderSequenceFragmentHandle(session, fragment, node, "edge top", null, "top"),
     createDiagramBuilderSequenceFragmentHandle(session, fragment, node, "edge right", "right", null),
@@ -5417,6 +5619,7 @@ function createDiagramBuilderSequenceFragmentNode(session, fragment) {
     node.addEventListener("focusout", () => {
       window.setTimeout(() => {
         if (!node.isConnected) return;
+        if (session.pendingContainerDeletion) return;
         if (!node.contains(document.activeElement)) session.finishSequenceFragmentEditing?.(true);
       }, 0);
     });
@@ -5553,11 +5756,21 @@ function createDiagramBuilderSwimlaneNode(session, swimlane) {
     editor.setAttribute("aria-label", "Bezeichnung der Swimlane bearbeiten");
     editor.addEventListener("blur", () => {
       window.setTimeout(() => {
-        if (document.activeElement?.closest?.(".diagram-builder-swimlane-boundary")) return;
+        if (session.pendingContainerDeletion) return;
+        if (document.activeElement?.closest?.(".diagram-builder-swimlane-boundary, .diagram-builder-container-move-handle")) return;
         session.finishSwimlaneEditing?.(true);
       }, 0);
     });
-    lane.append(editor);
+    lane.append(
+      editor,
+      createDiagramBuilderContainerMoveHandle(
+        session,
+        "swimlane",
+        swimlane,
+        lane,
+        { label: "Swimlane", horizontalOnly: true }
+      )
+    );
     lane.append(
       createDiagramBuilderSwimlaneBoundary(session, swimlane, "left", lane),
       createDiagramBuilderSwimlaneBoundary(session, swimlane, "right", lane)
@@ -5887,6 +6100,7 @@ function openDiagramBuilderMode(file) {
     draggingPlacementId: null,
     repositionPreviewCell: null,
     pendingDeletionId: null,
+    pendingContainerDeletion: null,
     editingPlacementId: null,
     finishEditing: null,
     editingConnectionId: null,
@@ -6055,6 +6269,12 @@ function openDiagramBuilderMode(file) {
       return;
     }
     if (event.key !== "Delete") return;
+    if (session.selectedSwimlaneId) {
+      session.swimlanes = session.swimlanes.filter((swimlane) => swimlane.id !== session.selectedSwimlaneId);
+      session.selectedSwimlaneId = null;
+      renderDiagramBuilderWorkspace(session);
+      return;
+    }
     if (session.selectedSystemBoundaryId) {
       session.systemBoundaries = session.systemBoundaries.filter((boundary) => boundary.id !== session.selectedSystemBoundaryId);
       session.selectedSystemBoundaryId = null;
