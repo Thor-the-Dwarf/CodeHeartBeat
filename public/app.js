@@ -6066,7 +6066,14 @@ function createDiagramBuilderLifelineNode(session, placement) {
 }
 
 function switchDiagramBuilderView(session, nextViewType) {
-  if (nextViewType === session.viewType) return;
+  if (nextViewType === session.viewType) {
+    session.viewButtons?.forEach((button) => {
+      const isActive = button.dataset.viewType === nextViewType;
+      button.classList.toggle("active", isActive);
+      button.setAttribute("aria-pressed", String(isActive));
+    });
+    return;
+  }
   session.finishEditing?.(true);
   session.finishConnectionEditing?.(true);
   session.finishSwimlaneEditing?.(true);
@@ -6098,6 +6105,11 @@ function switchDiagramBuilderView(session, nextViewType) {
   session.nextSystemBoundaryId = stored?.nextSystemBoundaryId || 0;
   session.nextSequenceFragmentId = stored?.nextSequenceFragmentId || 0;
   session.nextConnectionId = stored?.nextConnectionId || 0;
+  session.viewButtons?.forEach((button) => {
+    const isActive = button.dataset.viewType === nextViewType;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
   session.selectedPlacementId = null;
   session.selectedSwimlaneId = null;
   session.selectedSystemBoundaryId = null;
@@ -6180,16 +6192,17 @@ function openDiagramBuilderMode(file) {
   const header = createElement("header", "diagram-builder-header");
   const backButton = createElement("button", "diagram-builder-back-button", "← Zurück");
   backButton.type = "button";
-  const title = createElement("div", "diagram-builder-title");
-  title.append(createElement("small", "", "CODEHEARTBEAT"), createElement("strong", "", "DIAGRAMM ZEICHNEN"), createElement("span", "", file.name));
-  const selectorLabel = createElement("label", "diagram-builder-selector");
-  selectorLabel.append(createElement("span", "", "Diagrammart"));
-  const selector = document.createElement("select");
-  ["class", "state", "usecase", "activity", "sequence", "pap"].forEach((viewType) => {
-    selector.append(new Option(UML_VIEWS[viewType], viewType, false, viewType === "activity"));
+  const viewButtons = createElement("nav", "diagram-builder-view-buttons");
+  viewButtons.setAttribute("aria-label", "Diagrammart auswählen");
+  const diagramViewButtons = ["class", "state", "usecase", "activity", "sequence", "pap"].map((viewType) => {
+    const button = createElement("button", `diagram-builder-view-button${viewType === "activity" ? " active" : ""}`, UML_VIEWS[viewType]);
+    button.type = "button";
+    button.dataset.viewType = viewType;
+    button.setAttribute("aria-pressed", String(viewType === "activity"));
+    viewButtons.append(button);
+    return button;
   });
-  selectorLabel.append(selector);
-  header.append(backButton, title, selectorLabel);
+  header.append(backButton, viewButtons);
 
   const main = createElement("div", "diagram-builder-main");
   const left = createElement("section", "diagram-builder-left");
@@ -6228,7 +6241,7 @@ function openDiagramBuilderMode(file) {
   const session = {
     overlay,
     file,
-    selector,
+    viewButtons: diagramViewButtons,
     palette,
     paletteWrap,
     paletteLabel: status,
@@ -6376,7 +6389,9 @@ function openDiagramBuilderMode(file) {
   });
   toastCancelButton.addEventListener("click", () => cancelDiagramBuilderDeletion(session));
   toastDeleteButton.addEventListener("click", () => confirmDiagramBuilderDeletion(session));
-  selector.addEventListener("change", () => switchDiagramBuilderView(session, selector.value));
+  diagramViewButtons.forEach((button) => {
+    button.addEventListener("click", () => switchDiagramBuilderView(session, button.dataset.viewType));
+  });
   backButton.addEventListener("click", closeDiagramBuilderMode);
   session.handleKeyDown = (event) => {
     if (!session.toast.hidden) {
