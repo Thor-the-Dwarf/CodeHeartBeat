@@ -2843,6 +2843,22 @@ function renderDiagramBuilderPalette(session) {
   });
 }
 
+function requestDiagramBuilderDeletion(session, placement, clientX, clientY) {
+  clearDiagramBuilderRepositionPreview(session);
+  const sourceCell = session.surface.querySelector(`[data-placement-id="${placement.id}"]`);
+  const sourceRect = sourceCell?.getBoundingClientRect();
+  if (sourceCell && sourceRect) {
+    sourceCell.classList.remove("dragging");
+    sourceCell.classList.add("awaiting-delete-confirmation");
+    sourceCell.style.setProperty("--return-x", `${clientX - (sourceRect.left + sourceRect.width / 2)}px`);
+    sourceCell.style.setProperty("--return-y", `${clientY - (sourceRect.top + sourceRect.height / 2)}px`);
+  }
+  session.pendingDeletionId = placement.id;
+  session.toastMessage.textContent = `„${placement.piece.label || placement.piece.paletteLabel}“ wirklich löschen?`;
+  session.toast.hidden = false;
+  session.toastDeleteButton.focus({ preventScroll: true });
+}
+
 function showDiagramBuilderTrashTarget(session, placement) {
   clearDiagramBuilderPlacementMode(session);
   clearDiagramBuilderConnectionMode(session);
@@ -2867,18 +2883,7 @@ function showDiagramBuilderTrashTarget(session, placement) {
     trash.classList.remove("drag-over");
     const payload = event.dataTransfer.getData("text/plain");
     if (payload !== `placement:${placement.id}`) return;
-    clearDiagramBuilderRepositionPreview(session);
-    const sourceCell = session.surface.querySelector(`[data-placement-id="${placement.id}"]`);
-    const sourceRect = sourceCell?.getBoundingClientRect();
-    if (sourceCell && sourceRect) {
-      sourceCell.classList.add("awaiting-delete-confirmation");
-      sourceCell.style.setProperty("--return-x", `${event.clientX - (sourceRect.left + sourceRect.width / 2)}px`);
-      sourceCell.style.setProperty("--return-y", `${event.clientY - (sourceRect.top + sourceRect.height / 2)}px`);
-    }
-    session.pendingDeletionId = placement.id;
-    session.toastMessage.textContent = `„${placement.piece.label || placement.piece.paletteLabel}“ wirklich löschen?`;
-    session.toast.hidden = false;
-    session.toastDeleteButton.focus({ preventScroll: true });
+    requestDiagramBuilderDeletion(session, placement, event.clientX, event.clientY);
   });
   session.palette.replaceChildren(trash);
 }
@@ -3399,8 +3404,9 @@ function createDiagramBuilderPlacedNode(session, placement) {
   cell.dataset.placementId = String(placement.id);
   cell.style.left = `${placement.column * session.cellWidth}px`;
   cell.style.top = `${placement.row * session.cellHeight}px`;
-  cell.draggable = true;
+  cell.draggable = false;
   const node = createElement("div", `diagram-builder-piece ${placement.piece.kind}`);
+  node.draggable = false;
   const pieceMetrics = applyDiagramBuilderPieceMetrics(node, placement.piece);
   node.tabIndex = 0;
   node.setAttribute("role", "button");
@@ -3467,10 +3473,7 @@ function createDiagramBuilderPlacedNode(session, placement) {
     handle.title = handle.getAttribute("aria-label");
     handle.addEventListener("pointerdown", (event) => {
       event.stopPropagation();
-      cell.draggable = false;
     });
-    handle.addEventListener("pointerup", () => { cell.draggable = true; });
-    handle.addEventListener("pointerleave", () => { cell.draggable = true; });
     handle.addEventListener("dragstart", (event) => event.preventDefault());
     handle.addEventListener("click", (event) => {
       event.preventDefault();
@@ -3480,24 +3483,93 @@ function createDiagramBuilderPlacedNode(session, placement) {
     handles.append(handle);
   });
   cell.append(handles);
-  cell.addEventListener("dragstart", (event) => {
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", `placement:${placement.id}`);
-    const transparentDragImage = createElement("div", "diagram-builder-transparent-drag-image");
-    document.body.append(transparentDragImage);
-    event.dataTransfer.setDragImage(transparentDragImage, 0, 0);
-    window.requestAnimationFrame(() => transparentDragImage.remove());
-    cell.classList.add("dragging");
-    showDiagramBuilderTrashTarget(session, placement);
-    const cellRect = cell.getBoundingClientRect();
-    updateDiagramBuilderRepositionPreview(session, cellRect.left + cellRect.width / 2, cellRect.top + cellRect.height / 2);
-  });
-  cell.addEventListener("dragend", () => {
+  let pointerDrag = null;
+  let suppressPointerClick = false;
+  const movePointerDrag = (event) => {
+    if (!pointerDrag || pointerDrag.pointerId !== event.pointerId) return;
+    if (!pointerDrag.active && Math.hypot(event.clientX - pointerDrag.startX, event.clientY - pointerDrag.startY) < 8) return;
+    event.preventDefault();
+    if (!pointerDrag.active) {
+      pointerDrag.active = true;
+      suppressPointerClick = true;
+      cell.classList.add("dragging");
+      showDiagramBuilderTrashTarget(session, placement);
+    }
+    const trash = session.palette.querySelector(".diagram-builder-trash-target");
+    const trashRect = trash?.getBoundingClientRect();
+    const overTrash = Boolean(trashRect
+      && event.clientX >= trashRect.left && event.clientX <= trashRect.right
+      && event.clientY >= trashRect.top && event.clientY <= trashRect.bottom);
+    trash?.classList.toggle("drag-over", overTrash);
+    const surfaceRect = session.surface.getBoundingClientRect();
+    const overSurface = event.clientX >= surfaceRect.left && event.clientX <= surfaceRect.right
+      && event.clientY >= surfaceRect.top && event.clientY <= surfaceRect.bottom;
+    if (overSurface && !overTrash) updateDiagramBuilderRepositionPreview(session, event.clientX, event.clientY);
+    else clearDiagramBuilderRepositionPreview(session);
+  };
+  let cancelPointerDrag = null;
+  const finishPointerDrag = (event, cancelled = false) => {
+    if (!pointerDrag || pointerDrag.pointerId !== event.pointerId) return;
+    const wasActive = pointerDrag.active;
+    pointerDrag = null;
+    window.removeEventListener("pointermove", movePointerDrag);
+    window.removeEventListener("pointerup", finishPointerDrag);
+    window.removeEventListener("pointercancel", cancelPointerDrag);
+    if (!wasActive) return;
+    window.setTimeout(() => { suppressPointerClick = false; }, 0);
+    event.preventDefault();
+    event.stopPropagation();
+    const trash = session.palette.querySelector(".diagram-builder-trash-target");
+    const trashRect = trash?.getBoundingClientRect();
+    const overTrash = !cancelled && Boolean(trashRect
+      && event.clientX >= trashRect.left && event.clientX <= trashRect.right
+      && event.clientY >= trashRect.top && event.clientY <= trashRect.bottom);
+    const surfaceRect = session.surface.getBoundingClientRect();
+    const overSurface = !cancelled && event.clientX >= surfaceRect.left && event.clientX <= surfaceRect.right
+      && event.clientY >= surfaceRect.top && event.clientY <= surfaceRect.bottom;
+    const targetCell = overSurface ? diagramBuilderCellFromPoint(session, event.clientX, event.clientY) : null;
     clearDiagramBuilderRepositionPreview(session);
     cell.classList.remove("dragging");
     session.draggingPlacementId = null;
+    trash?.classList.remove("drag-over");
+    if (overTrash) {
+      requestDiagramBuilderDeletion(session, placement, event.clientX, event.clientY);
+      return;
+    }
     renderDiagramBuilderPalette(session);
+    if (!targetCell) {
+      setDiagramBuilderStatus(session, "Element ist an seiner Ausgangsposition geblieben.");
+      return;
+    }
+    if (diagramBuilderPlacementAt(session, targetCell.row, targetCell.column, placement.id)) {
+      setDiagramBuilderStatus(session, "Dieses Rasterfeld ist bereits belegt.", "error");
+      return;
+    }
+    placement.row = targetCell.row;
+    placement.column = targetCell.column;
+    session.selectedPlacementId = placement.id;
+    renderDiagramBuilderWorkspace(session);
+    setDiagramBuilderStatus(session, "Element ist in das neue Rasterfeld eingerastet.", "success");
+  };
+  cancelPointerDrag = (event) => finishPointerDrag(event, true);
+  node.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || session.pendingConnection || session.editingPlacementId) return;
+    pointerDrag = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      active: false
+    };
+    window.addEventListener("pointermove", movePointerDrag, { passive: false });
+    window.addEventListener("pointerup", finishPointerDrag);
+    window.addEventListener("pointercancel", cancelPointerDrag);
   });
+  node.addEventListener("click", (event) => {
+    if (!suppressPointerClick) return;
+    suppressPointerClick = false;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
   node.addEventListener("mouseenter", () => highlightDiagramBuilderCodeLine(session, placement.piece.lineIndex));
   node.addEventListener("mouseleave", () => highlightDiagramBuilderCodeLine(session, null));
   node.addEventListener("focus", () => highlightDiagramBuilderCodeLine(session, placement.piece.lineIndex));
