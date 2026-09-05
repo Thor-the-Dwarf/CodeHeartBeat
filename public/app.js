@@ -2673,12 +2673,19 @@ function diagramBuilderPieceMetrics(piece) {
     const diamondSize = Math.max(88, labelWidth + labelHeight + 32);
     return { elementWidth: diamondSize, elementHeight: diamondSize, labelWidth, visualWidth: diamondSize, visualHeight: diamondSize };
   }
+  if (piece.kind === "state") {
+    const behaviors = piece.behaviors || {};
+    const behaviorTexts = [behaviors.entry, behaviors.do, behaviors.exit].filter(Boolean).map(String);
+    const longestText = Math.max(0, text.length, ...behaviorTexts.map((value) => value.length + 8));
+    const elementWidth = Math.min(360, Math.max(190, longestText * 6 + 42));
+    const elementHeight = Math.max(96, 48 + behaviorTexts.length * 23);
+    return { elementWidth, elementHeight, labelWidth: elementWidth - 28, visualWidth: elementWidth, visualHeight: elementHeight };
+  }
   const fixedMetrics = {
     "class-box": [180, 112],
     "class-interface": [180, 112],
     "class-enum": [180, 112],
     "class-package": [170, 90],
-    state: [190, 96],
     actor: [80, 90],
     usecase: [180, 76],
     boundary: [330, 240],
@@ -2900,6 +2907,10 @@ function beginDiagramBuilderLabelEdit(session, placement) {
   session.finishEditing?.(true);
   clearDiagramBuilderConnectionMode(session);
   const node = session.surface.querySelector(`[data-placement-id="${placement.id}"] .diagram-builder-piece`);
+  if (placement.piece.kind === "state") {
+    beginDiagramBuilderStateEdit(session, placement, node);
+    return;
+  }
   const label = node?.querySelector(".diagram-builder-piece-label");
   if (!node || !label) return;
 
@@ -2927,6 +2938,78 @@ function beginDiagramBuilderLabelEdit(session, placement) {
   editor.addEventListener("blur", () => session.finishEditing?.(true));
   editor.focus();
   editor.select();
+}
+
+function beginDiagramBuilderStateEdit(session, placement, node) {
+  if (!node) return;
+  const originalLabel = placement.piece.label || "";
+  const originalBehaviors = { entry: "", do: "", exit: "", ...(placement.piece.behaviors || {}) };
+  const editor = createElement("div", "diagram-builder-state-editor");
+  const nameInput = createElement("input", "diagram-builder-label-editor diagram-builder-state-name-editor");
+  nameInput.type = "text";
+  nameInput.value = originalLabel;
+  nameInput.placeholder = "Zustandsname";
+  nameInput.setAttribute("aria-label", "Zustandsname bearbeiten");
+  editor.append(nameInput);
+  const behaviorInputs = {};
+  [["entry", "entry /"], ["do", "do /"], ["exit", "exit /"]].forEach(([key, prefix]) => {
+    const row = createElement("label", "diagram-builder-state-editor-row");
+    row.append(createElement("span", "diagram-builder-state-behavior-prefix", prefix));
+    const input = createElement("input", "diagram-builder-state-behavior-input");
+    input.type = "text";
+    input.value = originalBehaviors[key];
+    input.setAttribute("aria-label", `${prefix} Verhalten bearbeiten`);
+    behaviorInputs[key] = input;
+    row.append(input);
+    editor.append(row);
+  });
+  node.replaceChildren(editor);
+  node.classList.add("editing", "state-editing");
+  session.editingPlacementId = placement.id;
+  let finished = false;
+  session.finishEditing = (save) => {
+    if (finished) return;
+    finished = true;
+    placement.piece.label = save ? nameInput.value.trim() : originalLabel;
+    placement.piece.behaviors = save
+      ? Object.fromEntries(Object.entries(behaviorInputs).map(([key, input]) => [key, input.value.trim()]))
+      : originalBehaviors;
+    session.editingPlacementId = null;
+    session.finishEditing = null;
+    renderDiagramBuilderWorkspace(session);
+    setDiagramBuilderStatus(session, save ? "Zustandsverhalten übernommen." : "Bearbeitung abgebrochen.", save ? "success" : "");
+  };
+  editor.addEventListener("click", (event) => event.stopPropagation());
+  editor.addEventListener("dblclick", (event) => event.stopPropagation());
+  editor.addEventListener("contextmenu", (event) => event.stopPropagation());
+  editor.addEventListener("focusout", () => {
+    window.setTimeout(() => {
+      if (!editor.contains(document.activeElement)) session.finishEditing?.(true);
+    }, 0);
+  });
+  nameInput.focus();
+  nameInput.select();
+}
+
+function appendDiagramBuilderStateContent(node, piece) {
+  const content = createElement("div", "diagram-builder-state-content");
+  content.append(createElement("span", "diagram-builder-piece-label diagram-builder-state-name", piece.label || ""));
+  const behaviors = piece.behaviors || {};
+  const visibleBehaviors = [["entry", "entry /"], ["do", "do /"], ["exit", "exit /"]]
+    .filter(([key]) => String(behaviors[key] || "").trim());
+  if (visibleBehaviors.length) {
+    const behaviorList = createElement("div", "diagram-builder-state-behaviors");
+    visibleBehaviors.forEach(([key, prefix]) => {
+      const row = createElement("div", "diagram-builder-state-behavior");
+      row.append(
+        createElement("span", "diagram-builder-state-behavior-prefix", prefix),
+        createElement("span", "diagram-builder-state-behavior-text", behaviors[key])
+      );
+      behaviorList.append(row);
+    });
+    content.append(behaviorList);
+  }
+  node.append(content);
 }
 
 function renderDiagramBuilderPalette(session) {
@@ -3664,7 +3747,8 @@ function createDiagramBuilderPlacedNode(session, placement) {
   node.tabIndex = 0;
   node.setAttribute("role", "button");
   node.setAttribute("aria-label", `${placement.piece.label || placement.piece.paletteLabel}; Doppelklick zum Bearbeiten`);
-  node.append(createElement("span", "diagram-builder-piece-label", placement.piece.label));
+  if (placement.piece.kind === "state") appendDiagramBuilderStateContent(node, placement.piece);
+  else node.append(createElement("span", "diagram-builder-piece-label", placement.piece.label));
   cell.append(node);
 
   const selectNode = (event) => {
