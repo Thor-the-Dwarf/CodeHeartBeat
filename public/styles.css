@@ -3310,6 +3310,14 @@ body.folder-tree-resizing {
   min-width: 0;
 }
 
+.diagram-builder-decision-band-column {
+  width: 24px;
+}
+
+.diagram-builder-decision-label-column {
+  width: 192px;
+}
+
 .diagram-builder-decision-table {
   border-collapse: collapse;
   table-layout: fixed;
@@ -3327,7 +3335,7 @@ body.folder-tree-resizing {
 }
 
 .diagram-builder-decision-title {
-  width: 212px;
+  width: 216px;
   color: #fff0a7;
   background: #5b510d;
   font-size: 10px;
@@ -3406,8 +3414,8 @@ body.folder-tree-resizing {
 }
 
 .diagram-builder-decision-group-band {
-  width: 32px;
-  padding: 4px 2px !important;
+  width: 24px;
+  padding: 3px 1px !important;
   color: #fff0a7;
   background: #5b510d;
 }
@@ -3417,6 +3425,7 @@ body.folder-tree-resizing {
   letter-spacing: 0.02em;
   writing-mode: vertical-rl;
   transform: rotate(180deg);
+  font-size: 7px;
 }
 
 .diagram-builder-decision-row-label,

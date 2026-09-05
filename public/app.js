@@ -2711,15 +2711,36 @@ function showDiagramBuilderNotice(session, message) {
 }
 
 function diagramBuilderDecisionActionPortFraction(piece, metrics = diagramBuilderPieceMetrics(piece)) {
+  const fractions = diagramBuilderDecisionActionPortFractions(piece, metrics);
+  return fractions.reduce((sum, fraction) => sum + fraction, 0) / fractions.length;
+}
+
+function diagramBuilderDecisionActionPortFractions(piece, metrics = diagramBuilderPieceMetrics(piece)) {
   const conditionCount = diagramBuilderDecisionTableRows(piece, "conditions", "J").length;
   const actionCount = diagramBuilderDecisionTableRows(piece, "actions", "-").length;
   const headerHeight = 59;
-  const separatorHeight = 12;
-  const rowHeight = 34;
-  const tableHeight = headerHeight + (conditionCount + actionCount) * rowHeight + separatorHeight;
+  const separatorHeight = 29;
+  const rowHeight = 29;
+  const conditionHeight = Math.max(57, conditionCount * rowHeight);
+  const actionHeight = Math.max(48, actionCount * rowHeight);
+  const tableHeight = headerHeight + conditionHeight + actionHeight + separatorHeight;
   const topInset = Math.max(0, (metrics.elementHeight - tableHeight) / 2);
-  const actionCenter = topInset + headerHeight + conditionCount * rowHeight + separatorHeight + actionCount * rowHeight / 2;
-  return Math.max(0.1, Math.min(0.9, actionCenter / metrics.elementHeight));
+  const actionTop = topInset + headerHeight + conditionHeight + separatorHeight;
+  return Array.from({ length: actionCount }, (_, index) => (
+    Math.max(0.1, Math.min(0.9, (actionTop + (index + 0.5) * rowHeight) / metrics.elementHeight))
+  ));
+}
+
+function appendDiagramBuilderDecisionColumns(table, ruleCount) {
+  const columns = document.createElement("colgroup");
+  columns.append(
+    createElement("col", "diagram-builder-decision-band-column"),
+    createElement("col", "diagram-builder-decision-label-column")
+  );
+  for (let index = 0; index < ruleCount; index += 1) {
+    columns.append(createElement("col", "diagram-builder-decision-rule-column"));
+  }
+  table.append(columns);
 }
 
 function diagramBuilderPieceMetrics(piece) {
@@ -3191,6 +3212,7 @@ function beginDiagramBuilderDecisionTableEdit(session, placement, node) {
   let ruleCount = original.ruleCount;
   const editor = createElement("div", "diagram-builder-decision-editor");
   const table = createElement("table", "diagram-builder-decision-table editing-table");
+  appendDiagramBuilderDecisionColumns(table, ruleCount);
   const head = document.createElement("thead");
   const titleRow = document.createElement("tr");
   const titleCell = document.createElement("th");
@@ -3938,6 +3960,7 @@ function appendDiagramBuilderDecisionTableContent(node, piece, labelText) {
   const actions = diagramBuilderDecisionTableRows(piece, "actions", "-");
   const ruleCount = diagramBuilderDecisionRuleCount(piece);
   const table = createElement("table", "diagram-builder-decision-table");
+  appendDiagramBuilderDecisionColumns(table, ruleCount);
   const head = document.createElement("thead");
   const titleRow = document.createElement("tr");
   const title = document.createElement("th");
@@ -4753,7 +4776,7 @@ function renderDiagramBuilderEndpointControls(session, connection, route, surfac
   });
 }
 
-function startDiagramBuilderConnectionFromHandle(session, placement) {
+function startDiagramBuilderConnectionFromHandle(session, placement, decisionActionIndex = null) {
   clearDiagramBuilderPlacementMode(session);
   clearDiagramBuilderConnectionMode(session);
   session.pendingConnection = {
@@ -4762,7 +4785,8 @@ function startDiagramBuilderConnectionFromHandle(session, placement) {
     label: "",
     startMarker: "none",
     endMarker: "control",
-    lineType: session.viewType === "sequence" ? "sequence-sync" : session.viewType === "class" ? "class-relation" : ""
+    lineType: session.viewType === "sequence" ? "sequence-sync" : session.viewType === "class" ? "class-relation" : "",
+    decisionActionIndex
   };
   session.surface.classList.add("connecting");
   session.surface.querySelector(`[data-placement-id="${placement.id}"] .diagram-builder-piece`)?.classList.add("connection-source");
@@ -4906,11 +4930,24 @@ function drawDiagramBuilderConnections(session) {
       sourceSide = possibleSides.sort((left, right) => availableSpace[right] - availableSpace[left])[0];
     }
     const assignedSourceFraction = sourcePortAssignments.get(connection.id) || 0.5;
-    const decisionActionFraction = source.piece.kind === "pap-decision-table"
-      ? diagramBuilderDecisionActionPortFraction(source.piece)
+    const decisionActionFractions = source.piece.kind === "pap-decision-table"
+      ? diagramBuilderDecisionActionPortFractions(source.piece)
+      : null;
+    const outgoingDecisionConnections = decisionActionFractions
+      ? session.connections.filter((item) => item.sourceId === source.id).sort((left, right) => left.id - right.id)
+      : [];
+    const fallbackActionIndex = Math.max(0, outgoingDecisionConnections.findIndex((item) => item.id === connection.id));
+    const decisionActionIndex = decisionActionFractions
+      ? Math.min(
+        decisionActionFractions.length - 1,
+        Number.isInteger(connection.decisionActionIndex) ? connection.decisionActionIndex : fallbackActionIndex
+      )
+      : null;
+    const decisionActionFraction = decisionActionIndex !== null
+      ? decisionActionFractions[decisionActionIndex]
       : null;
     const fraction = decisionActionFraction !== null
-      ? Math.max(0.1, Math.min(0.9, decisionActionFraction + (isSelfConnection ? -0.06 + selfConnectionSpread : assignedSourceFraction - 0.5)))
+      ? Math.max(0.1, Math.min(0.9, decisionActionFraction + (isSelfConnection ? selfConnectionSpread : 0)))
       : isSelfConnection
         ? Math.max(0.18, Math.min(0.46, 0.34 + selfConnectionSpread))
         : assignedSourceFraction;
@@ -5133,6 +5170,9 @@ function createDiagramBuilderPlacedNode(session, placement) {
         startMarker: session.pendingConnection.startMarker,
         endMarker: session.pendingConnection.endMarker,
         lineType: session.pendingConnection.lineType || "",
+        decisionActionIndex: Number.isInteger(session.pendingConnection.decisionActionIndex)
+          ? session.pendingConnection.decisionActionIndex
+          : null,
         ...(isUseCaseDependency ? { useCaseRelation: "include" } : {})
       });
       clearDiagramBuilderConnectionMode(session);
@@ -5170,8 +5210,14 @@ function createDiagramBuilderPlacedNode(session, placement) {
     bottom: centerY + pieceMetrics.elementHeight / 2
   };
   const isDiamond = diagramBuilderIsDiamond(placement.piece);
+  const actionFractions = placement.piece.kind === "pap-decision-table"
+    ? diagramBuilderDecisionActionPortFractions(placement.piece, pieceMetrics)
+    : [];
   const connectionHandleSides = placement.piece.kind === "pap-decision-table"
-    ? [["right", "→"], ["left", "←"]]
+    ? actionFractions.flatMap((fraction, actionIndex) => [
+      ["right", "→", actionIndex, fraction],
+      ["left", "←", actionIndex, fraction]
+    ])
     : session.viewType === "sequence"
     ? (placement.piece.kind === "sequence-activation" ? [["right", "→"], ["left", "←"]] : [])
     : [
@@ -5180,10 +5226,8 @@ function createDiagramBuilderPlacedNode(session, placement) {
     ["bottom", "↓"],
     ["left", "←"]
   ];
-  connectionHandleSides.forEach(([side, icon]) => {
-    const fraction = placement.piece.kind === "pap-decision-table"
-      ? diagramBuilderDecisionActionPortFraction(placement.piece, pieceMetrics)
-      : 0.5;
+  connectionHandleSides.forEach(([side, icon, decisionActionIndex = null, actionFraction = 0.5]) => {
+    const fraction = actionFraction;
     const port = diagramBuilderPortOnBox(handleBox, side, fraction, isDiamond);
     const left = port.x + (side === "left" ? -8 : side === "right" ? 8 : 0);
     const top = port.y + (side === "top" ? -8 : side === "bottom" ? 8 : 0);
@@ -5192,7 +5236,9 @@ function createDiagramBuilderPlacedNode(session, placement) {
     handle.draggable = false;
     handle.style.left = `${left}px`;
     handle.style.top = `${top}px`;
-    handle.setAttribute("aria-label", "Verbindung beginnen; Anschlussseite wird nach Wahl des Ziels automatisch bestimmt");
+    handle.setAttribute("aria-label", Number.isInteger(decisionActionIndex)
+      ? `Verbindung für Aktion ${decisionActionIndex + 1} beginnen; Anschlussseite wird automatisch bestimmt`
+      : "Verbindung beginnen; Anschlussseite wird nach Wahl des Ziels automatisch bestimmt");
     handle.title = handle.getAttribute("aria-label");
     handle.addEventListener("pointerdown", (event) => {
       event.stopPropagation();
@@ -5201,7 +5247,7 @@ function createDiagramBuilderPlacedNode(session, placement) {
     handle.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      startDiagramBuilderConnectionFromHandle(session, placement);
+      startDiagramBuilderConnectionFromHandle(session, placement, decisionActionIndex);
     });
     handles.append(handle);
   });
