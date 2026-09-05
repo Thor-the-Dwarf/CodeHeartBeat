@@ -4297,9 +4297,7 @@ function renderDiagramBuilderEndpointControls(session, connection, route, surfac
       session.surface.querySelectorAll(".endpoint-drop-target").forEach((node) => node.classList.remove("endpoint-drop-target"));
     };
     const placementAtPointer = (clientX, clientY) => {
-      const counterpartId = endpoint === "start" ? connection.targetId : connection.sourceId;
       return session.placements.find((placement) => {
-        if (placement.id === counterpartId) return false;
         const node = session.surface.querySelector(`[data-placement-id="${placement.id}"] .diagram-builder-piece`);
         const rect = node?.getBoundingClientRect();
         return Boolean(rect && clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom);
@@ -4478,8 +4476,15 @@ function drawDiagramBuilderConnections(session) {
     if (!source || !target || !sourceNode || !targetNode) return;
     const sourceRect = sourceNode.getBoundingClientRect();
     const targetRect = targetNode.getBoundingClientRect();
-    const sourceSide = automaticSourceSides.get(connection.id) || "right";
-    const fraction = sourcePortAssignments.get(connection.id) || 0.5;
+    const isSelfConnection = source.id === target.id;
+    const selfConnections = isSelfConnection
+      ? session.connections.filter((item) => item.sourceId === source.id && item.targetId === source.id)
+      : [];
+    const selfConnectionIndex = isSelfConnection
+      ? Math.max(0, selfConnections.findIndex((item) => item.id === connection.id))
+      : 0;
+    const selfConnectionCenter = (selfConnections.length - 1) / 2;
+    const selfConnectionSpread = (selfConnectionIndex - selfConnectionCenter) * 0.045;
     const sourceBox = {
       left: (sourceRect.left - surfaceRect.left) / zoom,
       right: (sourceRect.right - surfaceRect.left) / zoom,
@@ -4492,12 +4497,35 @@ function drawDiagramBuilderConnections(session) {
       top: (targetRect.top - surfaceRect.top) / zoom,
       bottom: (targetRect.bottom - surfaceRect.top) / zoom
     };
+    let sourceSide = automaticSourceSides.get(connection.id) || "right";
+    if (isSelfConnection) {
+      const availableSpace = {
+        right: width - sourceBox.right,
+        left: sourceBox.left,
+        bottom: height - sourceBox.bottom,
+        top: sourceBox.top
+      };
+      const possibleSides = session.viewType === "sequence" ? ["right", "left"] : ["right", "left", "bottom", "top"];
+      sourceSide = possibleSides.sort((left, right) => availableSpace[right] - availableSpace[left])[0];
+    }
+    const fraction = isSelfConnection
+      ? Math.max(0.18, Math.min(0.46, 0.34 + selfConnectionSpread))
+      : sourcePortAssignments.get(connection.id) || 0.5;
     const sourcePort = diagramBuilderPortOnBox(sourceBox, sourceSide, fraction, diagramBuilderIsDiamond(source.piece));
     const sourceSpan = diagramBuilderPlacementSpan(session, source.piece);
     const sourceBoundary = sourceSide === "left" || sourceSide === "right"
       ? { x: (source.column + (sourceSide === "right" ? sourceSpan.columns : 0)) * session.cellWidth, y: sourcePort.y }
       : { x: sourcePort.x, y: (source.row + (sourceSide === "bottom" ? sourceSpan.rows : 0)) * session.cellHeight };
-    const preferredTargetSide = sourceSide === "left"
+    const selfLoopOffset = 26 + selfConnectionIndex * 10;
+    if (isSelfConnection) {
+      if (sourceSide === "right") sourceBoundary.x = sourceBox.right + selfLoopOffset;
+      if (sourceSide === "left") sourceBoundary.x = sourceBox.left - selfLoopOffset;
+      if (sourceSide === "bottom") sourceBoundary.y = sourceBox.bottom + selfLoopOffset;
+      if (sourceSide === "top") sourceBoundary.y = sourceBox.top - selfLoopOffset;
+    }
+    const preferredTargetSide = isSelfConnection
+      ? sourceSide
+      : sourceSide === "left"
       ? "right"
       : sourceSide === "right"
         ? "left"
@@ -4509,12 +4537,20 @@ function drawDiagramBuilderConnections(session) {
     const laneOffsets = [0];
     for (let lane = 1; lane <= Math.max(8, session.connections.length); lane += 1) laneOffsets.push(-lane * 5, lane * 5);
     targetSides.forEach((targetSide, targetSideIndex) => {
-      const targetFraction = targetPortAssignments.get(connection.id) || 0.5;
+      const targetFraction = isSelfConnection
+        ? Math.max(0.54, Math.min(0.82, 0.66 - selfConnectionSpread))
+        : targetPortAssignments.get(connection.id) || 0.5;
       const targetPort = diagramBuilderPortOnBox(targetBox, targetSide, targetFraction, diagramBuilderIsDiamond(target.piece));
       const targetSpan = diagramBuilderPlacementSpan(session, target.piece);
       const targetBoundary = targetSide === "left" || targetSide === "right"
         ? { x: (target.column + (targetSide === "right" ? targetSpan.columns : 0)) * session.cellWidth, y: targetPort.y }
         : { x: targetPort.x, y: (target.row + (targetSide === "bottom" ? targetSpan.rows : 0)) * session.cellHeight };
+      if (isSelfConnection) {
+        if (targetSide === "right") targetBoundary.x = targetBox.right + selfLoopOffset;
+        if (targetSide === "left") targetBoundary.x = targetBox.left - selfLoopOffset;
+        if (targetSide === "bottom") targetBoundary.y = targetBox.bottom + selfLoopOffset;
+        if (targetSide === "top") targetBoundary.y = targetBox.top - selfLoopOffset;
+      }
       const addRouteCandidate = (points, routeIndex, laneOffset, detour = false) => {
         const compactPoints = diagramBuilderCompactOrthogonalPath(points);
         const segments = compactPoints.slice(1).map((point, index) => ({ from: compactPoints[index], to: point }));
@@ -4666,7 +4702,7 @@ function createDiagramBuilderPlacedNode(session, placement) {
   cell.append(node);
 
   const selectNode = (event) => {
-    if (session.pendingConnection && session.pendingConnection.sourceId !== placement.id) {
+    if (session.pendingConnection) {
       session.connections.push({
         id: ++session.nextConnectionId,
         sourceId: session.pendingConnection.sourceId,
