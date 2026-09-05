@@ -1202,26 +1202,29 @@ body.folder-tree-resizing {
 }
 
 .diagram-builder-palette-item.activity-swimlane {
-  min-width: 138px;
+  min-width: 112px;
+  width: 112px;
+  max-width: 112px;
   border-width: 0 2px;
   border-radius: 0;
   background:
-    linear-gradient(rgba(199, 125, 255, 0.5), rgba(199, 125, 255, 0.5)) 0 16px / 100% 1px no-repeat,
+    linear-gradient(rgba(199, 125, 255, 0.5), rgba(199, 125, 255, 0.5)) 0 25px / 100% 1px no-repeat,
     rgba(25, 21, 32, 0.72);
 }
 
-.diagram-builder-palette-item.activity-swimlane::before,
-.diagram-builder-palette-item.activity-swimlane::after {
-  content: "";
+.diagram-builder-palette-item.activity-swimlane .diagram-builder-piece-label {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: #c77dff;
+  top: 7px;
+  left: 10px;
+  right: 10px;
+  z-index: 1;
+  width: auto;
+  overflow: hidden;
+  line-height: 12px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-
-.diagram-builder-palette-item.activity-swimlane::before { left: 33%; }
-.diagram-builder-palette-item.activity-swimlane::after { right: 33%; }
 
 .diagram-builder-palette-wrap.trash-active {
   background: rgba(52, 8, 18, 0.96);
