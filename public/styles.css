@@ -2162,11 +2162,22 @@ body.folder-tree-resizing {
   grid-template-columns: minmax(0, 1fr) 22px;
 }
 
+.diagram-builder-classifier-editor-row.sortable {
+  grid-template-columns: 22px minmax(0, 1fr) 22px;
+}
+
+.diagram-builder-classifier-editor-row.reordering {
+  z-index: 2;
+  opacity: 0.72;
+  filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.42));
+}
+
 .diagram-builder-classifier-row-input {
   padding: 4px 6px;
 }
 
 .diagram-builder-classifier-add,
+.diagram-builder-classifier-drag-handle,
 .diagram-builder-classifier-remove {
   display: grid;
   width: 22px;
@@ -2181,6 +2192,25 @@ body.folder-tree-resizing {
   font: 800 13px/1 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
 }
 
+.diagram-builder-classifier-drag-handle {
+  color: #91a5ba;
+  border-color: transparent;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+}
+
+.diagram-builder-classifier-drag-handle:active {
+  cursor: grabbing;
+}
+
+.diagram-builder-classifier-drag-icon {
+  display: block;
+  font-size: 16px;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
 .diagram-builder-classifier-remove {
   color: #ff9bb0;
   border-color: #754458;
@@ -2189,6 +2219,8 @@ body.folder-tree-resizing {
 
 .diagram-builder-classifier-add:hover,
 .diagram-builder-classifier-add:focus-visible,
+.diagram-builder-classifier-drag-handle:hover,
+.diagram-builder-classifier-drag-handle:focus-visible,
 .diagram-builder-classifier-remove:hover,
 .diagram-builder-classifier-remove:focus-visible,
 .diagram-builder-classifier-name-input:focus,

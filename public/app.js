@@ -3001,7 +3001,7 @@ function beginDiagramBuilderLabelEdit(session, placement) {
   editor.select();
 }
 
-function createDiagramBuilderClassifierSectionEditor(title, values, inputLabel) {
+function createDiagramBuilderClassifierSectionEditor(title, values, inputLabel, sortable = false) {
   const section = createElement("section", "diagram-builder-classifier-editor-section");
   const header = createElement("div", "diagram-builder-classifier-editor-section-header");
   header.append(createElement("strong", "", title));
@@ -3012,7 +3012,7 @@ function createDiagramBuilderClassifierSectionEditor(title, values, inputLabel) 
   header.append(addButton);
   const rows = createElement("div", "diagram-builder-classifier-editor-rows");
   const appendRow = (value = "") => {
-    const row = createElement("div", "diagram-builder-classifier-editor-row");
+    const row = createElement("div", `diagram-builder-classifier-editor-row${sortable ? " sortable" : ""}`);
     const input = createElement("input", "diagram-builder-classifier-row-input");
     input.type = "text";
     input.value = value;
@@ -3028,6 +3028,48 @@ function createDiagramBuilderClassifierSectionEditor(title, values, inputLabel) 
       row.remove();
       rows.querySelector("input")?.focus({ preventScroll: true });
     });
+    if (sortable) {
+      const dragHandle = createElement("button", "diagram-builder-classifier-drag-handle");
+      dragHandle.type = "button";
+      dragHandle.setAttribute("aria-label", `${inputLabel} verschieben`);
+      dragHandle.title = "Halten und ziehen, um die Reihenfolge zu ändern";
+      dragHandle.append(createElement("span", "diagram-builder-classifier-drag-icon", "⠿"));
+      dragHandle.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const pointerId = event.pointerId;
+        const classifierEditor = section.closest(".diagram-builder-classifier-editor");
+        if (classifierEditor) classifierEditor.dataset.reordering = "true";
+        row.classList.add("reordering");
+        const move = (moveEvent) => {
+          if (moveEvent.pointerId !== pointerId) return;
+          moveEvent.preventDefault();
+          const siblings = Array.from(rows.children).filter((candidate) => candidate !== row);
+          const nextRow = siblings.find((candidate) => {
+            const rect = candidate.getBoundingClientRect();
+            return moveEvent.clientY < rect.top + rect.height / 2;
+          });
+          if (nextRow) rows.insertBefore(row, nextRow);
+          else rows.append(row);
+        };
+        const finish = (finishEvent) => {
+          if (finishEvent.pointerId !== pointerId) return;
+          row.classList.remove("reordering");
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", finish);
+          window.removeEventListener("pointercancel", finish);
+          dragHandle.focus({ preventScroll: true });
+          window.setTimeout(() => {
+            if (classifierEditor) delete classifierEditor.dataset.reordering;
+          }, 0);
+        };
+        window.addEventListener("pointermove", move, { passive: false });
+        window.addEventListener("pointerup", finish);
+        window.addEventListener("pointercancel", finish);
+      });
+      row.append(dragHandle);
+    }
     row.append(input, deleteButton);
     rows.append(row);
     input.focus({ preventScroll: true });
@@ -3067,8 +3109,8 @@ function beginDiagramBuilderClassifierEdit(session, placement, node) {
     sections.literals = createDiagramBuilderClassifierSectionEditor("Konstanten", original.literals, "Konstante");
     editor.append(sections.literals.section);
   } else {
-    sections.attributes = createDiagramBuilderClassifierSectionEditor("Attribute", original.attributes, "Attribut");
-    sections.methods = createDiagramBuilderClassifierSectionEditor("Methoden", original.methods, "Methode");
+    sections.attributes = createDiagramBuilderClassifierSectionEditor("Attribute", original.attributes, "Attribut", true);
+    sections.methods = createDiagramBuilderClassifierSectionEditor("Methoden", original.methods, "Methode", true);
     editor.append(sections.attributes.section, sections.methods.section);
   }
 
@@ -3097,6 +3139,7 @@ function beginDiagramBuilderClassifierEdit(session, placement, node) {
   editor.addEventListener("contextmenu", (event) => event.stopPropagation());
   editor.addEventListener("focusout", () => {
     window.setTimeout(() => {
+      if (editor.dataset.reordering === "true") return;
       if (!editor.contains(document.activeElement)) session.finishEditing?.(true);
     }, 0);
   });
