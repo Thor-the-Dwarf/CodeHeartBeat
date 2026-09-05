@@ -1569,6 +1569,214 @@ body.folder-tree-resizing {
 .diagram-builder-system-boundary-handle.bottom-right { right: -10px; bottom: -10px; cursor: nwse-resize; }
 .diagram-builder-system-boundary-handle.bottom-left { bottom: -10px; left: -10px; cursor: nesw-resize; }
 
+.diagram-builder-sequence-fragment-frame {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  min-width: var(--builder-cell-width, 140px);
+  min-height: var(--builder-cell-height, 100px);
+  border: 2px solid rgba(184, 196, 214, 0.8);
+  background: rgba(12, 17, 25, 0.1);
+  pointer-events: none;
+  transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+
+.diagram-builder-sequence-fragment-frame.selected,
+.diagram-builder-sequence-fragment-frame.editing,
+.diagram-builder-sequence-fragment-frame:has(.diagram-builder-sequence-fragment-handle:hover),
+.diagram-builder-sequence-fragment-frame.resizing {
+  z-index: 9;
+  border-color: #c77dff;
+  background: rgba(94, 53, 116, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(199, 125, 255, 0.12);
+}
+
+.diagram-builder-sequence-fragment-header {
+  position: absolute;
+  z-index: 7;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  pointer-events: none;
+}
+
+.diagram-builder-sequence-fragment-operator,
+.diagram-builder-sequence-fragment-operator-select {
+  min-width: 72px;
+  height: 30px;
+  padding: 5px 18px 5px 9px;
+  border: 0;
+  border-right: 1px solid #9fb2c9;
+  border-bottom: 1px solid #9fb2c9;
+  border-radius: 0;
+  color: #fff0a7;
+  background: #243246;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 13px) 100%, 0 100%);
+  font: 800 11px/1 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  text-align: left;
+  pointer-events: auto;
+}
+
+.diagram-builder-sequence-fragment-operator {
+  cursor: text;
+}
+
+.diagram-builder-sequence-fragment-operator-select {
+  min-width: 96px;
+  outline: none;
+  cursor: pointer;
+}
+
+.diagram-builder-sequence-fragment-operator-select:focus {
+  background: #3b2850;
+}
+
+.diagram-builder-sequence-fragment-add {
+  height: 25px;
+  padding: 3px 8px;
+  border: 1px solid #6f5380;
+  border-radius: 4px;
+  color: #efe7f5;
+  background: #24172d;
+  font: 700 9px/1 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  pointer-events: auto;
+}
+
+.diagram-builder-sequence-fragment-operands {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding-top: 30px;
+  pointer-events: none;
+}
+
+.diagram-builder-sequence-fragment-operand {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 34px;
+  padding: 8px 40px 8px 10px;
+  border-top: 1px dashed rgba(207, 217, 230, 0.72);
+}
+
+.diagram-builder-sequence-fragment-operand:first-child {
+  border-top: 0;
+}
+
+.diagram-builder-sequence-fragment-operand-label {
+  display: block;
+  overflow: hidden;
+  color: #ffe2a6;
+  font: 700 10px/1.3 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagram-builder-sequence-fragment-operand-input {
+  box-sizing: border-box;
+  width: min(260px, calc(100% - 4px));
+  padding: 5px 7px;
+  border: 1px solid #526a82;
+  border-radius: 4px;
+  color: #f5f8fd;
+  background: rgba(8, 13, 21, 0.94);
+  outline: none;
+  font: 700 9px/1.2 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  pointer-events: auto;
+}
+
+.diagram-builder-sequence-fragment-operand-input:focus {
+  border-color: #c77dff;
+  box-shadow: 0 0 0 2px rgba(199, 125, 255, 0.16);
+}
+
+.diagram-builder-sequence-fragment-remove {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  display: grid;
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  border: 1px solid #8a4555;
+  border-radius: 4px;
+  color: #ff9cac;
+  background: #351821;
+  font-size: 16px;
+  pointer-events: auto;
+  place-items: center;
+}
+
+.diagram-builder-sequence-fragment-handle {
+  position: absolute;
+  z-index: 8;
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.diagram-builder-sequence-fragment-handle.edge.top,
+.diagram-builder-sequence-fragment-handle.edge.bottom {
+  right: 10px;
+  left: 10px;
+  height: 14px;
+  cursor: ns-resize;
+}
+
+.diagram-builder-sequence-fragment-handle.edge.left,
+.diagram-builder-sequence-fragment-handle.edge.right {
+  top: 10px;
+  bottom: 10px;
+  width: 14px;
+  cursor: ew-resize;
+}
+
+.diagram-builder-sequence-fragment-handle.edge.top { top: -7px; }
+.diagram-builder-sequence-fragment-handle.edge.right { right: -7px; }
+.diagram-builder-sequence-fragment-handle.edge.bottom { bottom: -7px; }
+.diagram-builder-sequence-fragment-handle.edge.left { left: -7px; }
+
+.diagram-builder-sequence-fragment-handle.corner {
+  z-index: 9;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+
+.diagram-builder-sequence-fragment-handle.corner::after {
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: #c77dff;
+  box-shadow: 0 0 8px rgba(199, 125, 255, 0.6);
+  content: "";
+  opacity: 0;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.diagram-builder-sequence-fragment-frame.selected .diagram-builder-sequence-fragment-handle.corner::after,
+.diagram-builder-sequence-fragment-handle.corner:hover::after,
+.diagram-builder-sequence-fragment-handle.corner:focus-visible::after {
+  opacity: 1;
+}
+
+.diagram-builder-sequence-fragment-handle.corner:hover::after,
+.diagram-builder-sequence-fragment-handle.corner:focus-visible::after {
+  transform: scale(1.45);
+}
+
+.diagram-builder-sequence-fragment-handle.top-left { top: -10px; left: -10px; cursor: nwse-resize; }
+.diagram-builder-sequence-fragment-handle.top-right { top: -10px; right: -10px; cursor: nesw-resize; }
+.diagram-builder-sequence-fragment-handle.bottom-right { right: -10px; bottom: -10px; cursor: nwse-resize; }
+.diagram-builder-sequence-fragment-handle.bottom-left { bottom: -10px; left: -10px; cursor: nesw-resize; }
+
 .diagram-builder-cursor-piece .diagram-builder-piece.activity-swimlane,
 .diagram-builder-floating-cursor .diagram-builder-piece.activity-swimlane {
   width: calc(var(--builder-cell-width, 140px) - 22px);

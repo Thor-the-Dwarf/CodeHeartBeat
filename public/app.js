@@ -2814,7 +2814,8 @@ function updateDiagramBuilderGridMetrics(session) {
     0,
     ...session.placements.map((placement) => placement.column + diagramBuilderPlacementSpan(session, placement.piece).columns - 1),
     ...session.swimlanes.map((swimlane) => swimlane.rightColumn - 1),
-    ...session.systemBoundaries.map((boundary) => boundary.rightColumn - 1)
+    ...session.systemBoundaries.map((boundary) => boundary.rightColumn - 1),
+    ...session.sequenceFragments.map((fragment) => fragment.rightColumn - 1)
   );
   const maximumRow = Math.max(
     0,
@@ -2824,6 +2825,7 @@ function updateDiagramBuilderGridMetrics(session) {
         : diagramBuilderPlacementSpan(session, placement.piece).rows
     ) - 1),
     ...session.systemBoundaries.map((boundary) => boundary.bottomRow - 1),
+    ...session.sequenceFragments.map((fragment) => fragment.bottomRow - 1),
     ...session.placements
       .filter((placement) => diagramBuilderIsSequenceParticipant(placement.piece))
       .map((placement) => placement.row + Math.max(1, Number(placement.piece.lifelineRows) || 1))
@@ -2902,7 +2904,7 @@ function diagramBuilderCanResizeActivation(session, placement, row, activationRo
 }
 
 function diagramBuilderCanPlacePiece(session, piece, row, column, ignoredId = null) {
-  if (piece.kind === "boundary") return true;
+  if (["boundary", "sequence-fragment"].includes(piece.kind)) return true;
   if (diagramBuilderPlacementOverlaps(session, piece, row, column, ignoredId)) return false;
   if (piece.kind === "sequence-activation") {
     const rows = Math.max(1, Number(piece.activationRows) || 1);
@@ -3085,6 +3087,7 @@ function beginDiagramBuilderPaletteDrag(session, pieceIndex, button, event) {
 function beginDiagramBuilderLabelEdit(session, placement) {
   session.finishEditing?.(true);
   session.finishSystemBoundaryEditing?.(true);
+  session.finishSequenceFragmentEditing?.(true);
   clearDiagramBuilderConnectionMode(session);
   const node = session.surface.querySelector(`[data-placement-id="${placement.id}"] .diagram-builder-piece`);
   if (diagramBuilderIsSequenceParticipant(placement.piece)) {
@@ -4205,6 +4208,7 @@ function diagramBuilderTargetPortAssignments(session, sourceSides) {
 function beginDiagramBuilderConnectionLabelEdit(session, connection, clientX, clientY) {
   session.finishConnectionEditing?.(true);
   session.finishSystemBoundaryEditing?.(true);
+  session.finishSequenceFragmentEditing?.(true);
   const original = {
     label: connection.label || "",
     startMarker: connection.startMarker || "none",
@@ -4748,8 +4752,9 @@ function createDiagramBuilderPlacedNode(session, placement) {
     session.selectedPlacementId = placement.id;
     session.selectedSwimlaneId = null;
     session.selectedSystemBoundaryId = null;
+    session.selectedSequenceFragmentId = null;
     session.surface.querySelectorAll(".diagram-builder-piece.selected").forEach((item) => item.classList.remove("selected"));
-    session.surface.querySelectorAll(".diagram-builder-swimlane.selected, .diagram-builder-system-boundary.selected").forEach((item) => item.classList.remove("selected"));
+    session.surface.querySelectorAll(".diagram-builder-swimlane.selected, .diagram-builder-system-boundary.selected, .diagram-builder-sequence-fragment-frame.selected").forEach((item) => item.classList.remove("selected"));
     node.classList.add("selected");
   };
   node.addEventListener("click", selectNode);
@@ -4928,6 +4933,7 @@ function beginDiagramBuilderSystemBoundaryResize(session, boundary, node, horizo
   event.stopPropagation();
   session.selectedPlacementId = null;
   session.selectedSwimlaneId = null;
+  session.selectedSequenceFragmentId = null;
   session.selectedSystemBoundaryId = boundary.id;
   node.classList.add("selected", "resizing");
   const pointerId = event.pointerId;
@@ -4979,6 +4985,7 @@ function beginDiagramBuilderSystemBoundaryEdit(session, boundary) {
   session.finishConnectionEditing?.(true);
   session.finishSwimlaneEditing?.(true);
   session.finishSystemBoundaryEditing?.(true);
+  session.finishSequenceFragmentEditing?.(true);
   clearDiagramBuilderPlacementMode(session);
   clearDiagramBuilderConnectionMode(session);
   const original = {
@@ -4991,6 +4998,7 @@ function beginDiagramBuilderSystemBoundaryEdit(session, boundary) {
   session.editingSystemBoundaryId = boundary.id;
   session.selectedPlacementId = null;
   session.selectedSwimlaneId = null;
+  session.selectedSequenceFragmentId = null;
   session.selectedSystemBoundaryId = boundary.id;
   let finished = false;
   session.finishSystemBoundaryEditing = (save) => {
@@ -5079,6 +5087,7 @@ function createDiagramBuilderSystemBoundaryNode(session, boundary) {
     event.stopPropagation();
     session.selectedPlacementId = null;
     session.selectedSwimlaneId = null;
+    session.selectedSequenceFragmentId = null;
     session.selectedSystemBoundaryId = boundary.id;
     session.surface.querySelectorAll(".diagram-builder-piece.selected, .diagram-builder-swimlane.selected, .diagram-builder-system-boundary.selected")
       .forEach((item) => item.classList.remove("selected"));
@@ -5105,9 +5114,248 @@ function addDiagramBuilderSystemBoundary(session, row, column) {
   session.systemBoundaries.push(boundary);
   session.selectedPlacementId = null;
   session.selectedSwimlaneId = null;
+  session.selectedSequenceFragmentId = null;
   session.selectedSystemBoundaryId = boundary.id;
   renderDiagramBuilderWorkspace(session);
   setDiagramBuilderStatus(session, "Systemgrenze platziert. Bezeichnung doppelklicken oder Kanten und Ecken ziehen.", "success");
+  return true;
+}
+
+function applyDiagramBuilderSequenceFragmentGeometry(session, fragment, node) {
+  node.style.left = `${fragment.leftColumn * session.cellWidth}px`;
+  node.style.top = `${fragment.topRow * session.cellHeight}px`;
+  node.style.width = `${(fragment.rightColumn - fragment.leftColumn) * session.cellWidth}px`;
+  node.style.height = `${(fragment.bottomRow - fragment.topRow) * session.cellHeight}px`;
+}
+
+function beginDiagramBuilderSequenceFragmentResize(session, fragment, node, horizontalSide, verticalSide, event) {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  event.stopPropagation();
+  session.selectedPlacementId = null;
+  session.selectedSwimlaneId = null;
+  session.selectedSystemBoundaryId = null;
+  session.selectedSequenceFragmentId = fragment.id;
+  node.classList.add("selected", "resizing");
+  const pointerId = event.pointerId;
+  const move = (moveEvent) => {
+    if (moveEvent.pointerId !== pointerId) return;
+    moveEvent.preventDefault();
+    const line = diagramBuilderGridLineFromPoint(session, moveEvent.clientX, moveEvent.clientY);
+    if (horizontalSide === "left") fragment.leftColumn = Math.min(fragment.rightColumn - 1, line.column);
+    if (horizontalSide === "right") fragment.rightColumn = Math.max(fragment.leftColumn + 1, line.column);
+    if (verticalSide === "top") fragment.topRow = Math.min(fragment.bottomRow - 1, line.row);
+    if (verticalSide === "bottom") fragment.bottomRow = Math.max(fragment.topRow + 1, line.row);
+    updateDiagramBuilderGridMetrics(session);
+    applyDiagramBuilderSequenceFragmentGeometry(session, fragment, node);
+    setDiagramBuilderStatus(session, "Kombiniertes Fragment ist auf den Gridlinien eingerastet.", "success");
+  };
+  const finish = (finishEvent) => {
+    if (finishEvent.pointerId !== pointerId) return;
+    node.classList.remove("resizing");
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", finish);
+    window.removeEventListener("pointercancel", finish);
+  };
+  window.addEventListener("pointermove", move, { passive: false });
+  window.addEventListener("pointerup", finish);
+  window.addEventListener("pointercancel", finish);
+}
+
+function createDiagramBuilderSequenceFragmentHandle(session, fragment, node, className, horizontalSide = null, verticalSide = null) {
+  const handle = createElement("button", `diagram-builder-sequence-fragment-handle ${className}`);
+  handle.type = "button";
+  const description = horizontalSide && verticalSide
+    ? `${horizontalSide === "left" ? "linken" : "rechten"} ${verticalSide === "top" ? "oberen" : "unteren"} Ecke`
+    : `${horizontalSide === "left" ? "linken" : horizontalSide === "right" ? "rechten" : verticalSide === "top" ? "oberen" : "unteren"} Kante`;
+  handle.setAttribute("aria-label", `Kombiniertes Fragment an der ${description} verändern`);
+  handle.title = `${description} ziehen · rastet auf Gridlinien ein`;
+  handle.addEventListener("pointerdown", (event) => beginDiagramBuilderSequenceFragmentResize(
+    session,
+    fragment,
+    node,
+    horizontalSide,
+    verticalSide,
+    event
+  ));
+  return handle;
+}
+
+function syncDiagramBuilderSequenceFragmentEditor(session, fragment) {
+  const node = session.surface.querySelector(`[data-sequence-fragment-id="${fragment.id}"]`);
+  const operator = node?.querySelector(".diagram-builder-sequence-fragment-operator-select");
+  const inputs = node?.querySelectorAll(".diagram-builder-sequence-fragment-operand-input");
+  if (operator) fragment.operator = operator.value;
+  if (inputs?.length) fragment.operands = Array.from(inputs, (input) => input.value.trim());
+}
+
+function beginDiagramBuilderSequenceFragmentEdit(session, fragment) {
+  session.finishEditing?.(true);
+  session.finishConnectionEditing?.(true);
+  session.finishSwimlaneEditing?.(true);
+  session.finishSystemBoundaryEditing?.(true);
+  session.finishSequenceFragmentEditing?.(true);
+  clearDiagramBuilderPlacementMode(session);
+  clearDiagramBuilderConnectionMode(session);
+  const original = {
+    operator: fragment.operator,
+    operands: [...fragment.operands],
+    leftColumn: fragment.leftColumn,
+    rightColumn: fragment.rightColumn,
+    topRow: fragment.topRow,
+    bottomRow: fragment.bottomRow
+  };
+  session.editingSequenceFragmentId = fragment.id;
+  session.selectedPlacementId = null;
+  session.selectedSwimlaneId = null;
+  session.selectedSystemBoundaryId = null;
+  session.selectedSequenceFragmentId = fragment.id;
+  let finished = false;
+  session.finishSequenceFragmentEditing = (save) => {
+    if (finished) return;
+    finished = true;
+    if (save) syncDiagramBuilderSequenceFragmentEditor(session, fragment);
+    else Object.assign(fragment, original, { operands: [...original.operands] });
+    session.editingSequenceFragmentId = null;
+    session.finishSequenceFragmentEditing = null;
+    renderDiagramBuilderWorkspace(session);
+    setDiagramBuilderStatus(
+      session,
+      save ? "Kombiniertes Fragment übernommen." : "Bearbeitung des kombinierten Fragments abgebrochen.",
+      save ? "success" : ""
+    );
+  };
+  renderDiagramBuilderWorkspace(session);
+  session.surface.querySelector(`[data-sequence-fragment-id="${fragment.id}"] select`)?.focus({ preventScroll: true });
+}
+
+function createDiagramBuilderSequenceFragmentNode(session, fragment) {
+  const isEditing = session.editingSequenceFragmentId === fragment.id;
+  const node = createElement(
+    "section",
+    `diagram-builder-sequence-fragment-frame${isEditing ? " editing" : ""}${session.selectedSequenceFragmentId === fragment.id ? " selected" : ""}`
+  );
+  node.dataset.sequenceFragmentId = String(fragment.id);
+  node.setAttribute("aria-label", `Kombiniertes Fragment ${fragment.operator}; doppelklicken zum Bearbeiten`);
+  applyDiagramBuilderSequenceFragmentGeometry(session, fragment, node);
+
+  const header = createElement("div", "diagram-builder-sequence-fragment-header");
+  if (isEditing) {
+    const select = createElement("select", "diagram-builder-sequence-fragment-operator-select");
+    select.setAttribute("aria-label", "Typ des kombinierten Fragments");
+    ["alt", "if", "else if", "else"].forEach((operator) => select.append(new Option(operator, operator, false, fragment.operator === operator)));
+    header.append(select);
+    const addOperand = createElement("button", "diagram-builder-sequence-fragment-add", "+ Bereich");
+    addOperand.type = "button";
+    addOperand.setAttribute("aria-label", "Bereich zum kombinierten Fragment hinzufügen");
+    addOperand.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      syncDiagramBuilderSequenceFragmentEditor(session, fragment);
+      fragment.operands.push("");
+      renderDiagramBuilderWorkspace(session);
+      const inputs = session.surface.querySelectorAll(`[data-sequence-fragment-id="${fragment.id}"] .diagram-builder-sequence-fragment-operand-input`);
+      inputs[inputs.length - 1]?.focus({ preventScroll: true });
+    });
+    header.append(addOperand);
+  } else {
+    const operator = createElement("button", "diagram-builder-sequence-fragment-operator", fragment.operator);
+    operator.type = "button";
+    operator.setAttribute("aria-label", `${fragment.operator}; doppelklicken zum Bearbeiten des kombinierten Fragments`);
+    operator.addEventListener("dblclick", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      beginDiagramBuilderSequenceFragmentEdit(session, fragment);
+    });
+    header.append(operator);
+  }
+  node.append(header);
+
+  const operands = createElement("div", "diagram-builder-sequence-fragment-operands");
+  fragment.operands.forEach((label, index) => {
+    const operand = createElement("div", "diagram-builder-sequence-fragment-operand");
+    if (isEditing) {
+      const input = createElement("input", "diagram-builder-sequence-fragment-operand-input");
+      input.type = "text";
+      input.value = label;
+      input.placeholder = index === 0 ? "Bedingung oder Beschreibung" : "Weiterer Bereich";
+      input.setAttribute("aria-label", `Beschriftung für Bereich ${index + 1}`);
+      operand.append(input);
+      if (fragment.operands.length > 1) {
+        const remove = createElement("button", "diagram-builder-sequence-fragment-remove", "×");
+        remove.type = "button";
+        remove.setAttribute("aria-label", `Bereich ${index + 1} löschen`);
+        remove.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          syncDiagramBuilderSequenceFragmentEditor(session, fragment);
+          fragment.operands.splice(index, 1);
+          renderDiagramBuilderWorkspace(session);
+          session.surface.querySelector(`[data-sequence-fragment-id="${fragment.id}"] .diagram-builder-sequence-fragment-operand-input`)?.focus({ preventScroll: true });
+        });
+        operand.append(remove);
+      }
+    } else if (label) {
+      const visibleLabel = label.startsWith("[") && label.endsWith("]") ? label : `[${label}]`;
+      operand.append(createElement("span", "diagram-builder-sequence-fragment-operand-label", visibleLabel));
+    }
+    operands.append(operand);
+  });
+  node.append(operands);
+  node.append(
+    createDiagramBuilderSequenceFragmentHandle(session, fragment, node, "edge top", null, "top"),
+    createDiagramBuilderSequenceFragmentHandle(session, fragment, node, "edge right", "right", null),
+    createDiagramBuilderSequenceFragmentHandle(session, fragment, node, "edge bottom", null, "bottom"),
+    createDiagramBuilderSequenceFragmentHandle(session, fragment, node, "edge left", "left", null),
+    createDiagramBuilderSequenceFragmentHandle(session, fragment, node, "corner top-left", "left", "top"),
+    createDiagramBuilderSequenceFragmentHandle(session, fragment, node, "corner top-right", "right", "top"),
+    createDiagramBuilderSequenceFragmentHandle(session, fragment, node, "corner bottom-right", "right", "bottom"),
+    createDiagramBuilderSequenceFragmentHandle(session, fragment, node, "corner bottom-left", "left", "bottom")
+  );
+  node.addEventListener("click", (event) => {
+    event.stopPropagation();
+    session.selectedPlacementId = null;
+    session.selectedSwimlaneId = null;
+    session.selectedSystemBoundaryId = null;
+    session.selectedSequenceFragmentId = fragment.id;
+    session.surface.querySelectorAll(".diagram-builder-piece.selected, .diagram-builder-swimlane.selected, .diagram-builder-system-boundary.selected, .diagram-builder-sequence-fragment-frame.selected")
+      .forEach((item) => item.classList.remove("selected"));
+    node.classList.add("selected");
+  });
+  node.addEventListener("dblclick", (event) => {
+    if (isEditing || event.target.closest(".diagram-builder-sequence-fragment-handle")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    beginDiagramBuilderSequenceFragmentEdit(session, fragment);
+  });
+  if (isEditing) {
+    node.addEventListener("focusout", () => {
+      window.setTimeout(() => {
+        if (!node.isConnected) return;
+        if (!node.contains(document.activeElement)) session.finishSequenceFragmentEditing?.(true);
+      }, 0);
+    });
+  }
+  return node;
+}
+
+function addDiagramBuilderSequenceFragment(session, row, column) {
+  const fragment = {
+    id: ++session.nextSequenceFragmentId,
+    operator: "alt",
+    operands: ["", ""],
+    leftColumn: Math.max(0, column),
+    rightColumn: Math.max(0, column) + 4,
+    topRow: Math.max(0, row),
+    bottomRow: Math.max(0, row) + 4
+  };
+  session.sequenceFragments.push(fragment);
+  session.selectedPlacementId = null;
+  session.selectedSwimlaneId = null;
+  session.selectedSystemBoundaryId = null;
+  session.selectedSequenceFragmentId = fragment.id;
+  renderDiagramBuilderWorkspace(session);
+  setDiagramBuilderStatus(session, "Kombiniertes Fragment platziert. Doppelklick auf den Fragmenttyp öffnet den Bearbeitungsmodus.", "success");
   return true;
 }
 
@@ -5121,6 +5369,7 @@ function beginDiagramBuilderSwimlaneEdit(session, swimlane) {
   session.finishConnectionEditing?.(true);
   session.finishSwimlaneEditing?.(true);
   session.finishSystemBoundaryEditing?.(true);
+  session.finishSequenceFragmentEditing?.(true);
   clearDiagramBuilderPlacementMode(session);
   clearDiagramBuilderConnectionMode(session);
   const original = {
@@ -5200,6 +5449,7 @@ function createDiagramBuilderSwimlaneNode(session, swimlane) {
     session.selectedPlacementId = null;
     session.selectedSwimlaneId = swimlane.id;
     session.selectedSystemBoundaryId = null;
+    session.selectedSequenceFragmentId = null;
     session.surface.querySelectorAll(".diagram-builder-piece.selected, .diagram-builder-system-boundary.selected").forEach((item) => item.classList.remove("selected"));
     session.surface.querySelectorAll(".diagram-builder-swimlane.selected").forEach((item) => item.classList.remove("selected"));
     lane.classList.add("selected");
@@ -5253,7 +5503,10 @@ function addDiagramBuilderSwimlane(session, piece, column) {
     rightColumn: Math.min(columns, leftColumn + 1)
   };
   session.swimlanes.push(swimlane);
+  session.selectedPlacementId = null;
   session.selectedSwimlaneId = swimlane.id;
+  session.selectedSystemBoundaryId = null;
+  session.selectedSequenceFragmentId = null;
   renderDiagramBuilderWorkspace(session);
   setDiagramBuilderStatus(session, "Swimlane platziert. Doppelklick auf den Klassennamen öffnet den Bearbeitungsmodus.", "success");
   return true;
@@ -5262,6 +5515,7 @@ function addDiagramBuilderSwimlane(session, piece, column) {
 function addDiagramBuilderPlacement(session, piece, row, column) {
   if (piece.kind === "activity-swimlane") return addDiagramBuilderSwimlane(session, piece, column);
   if (piece.kind === "boundary") return addDiagramBuilderSystemBoundary(session, row, column);
+  if (piece.kind === "sequence-fragment") return addDiagramBuilderSequenceFragment(session, row, column);
   if (!diagramBuilderCanPlacePiece(session, piece, row, column)) {
     setDiagramBuilderStatus(
       session,
@@ -5283,6 +5537,9 @@ function addDiagramBuilderPlacement(session, piece, row, column) {
   const placement = { id: ++session.nextPlacementId, piece: placedPiece, row, column };
   session.placements.push(placement);
   session.selectedPlacementId = placement.id;
+  session.selectedSwimlaneId = null;
+  session.selectedSystemBoundaryId = null;
+  session.selectedSequenceFragmentId = null;
   renderDiagramBuilderWorkspace(session);
   setDiagramBuilderStatus(session, "Element eingerastet. Beim Hover erscheinen die Verbindungsanschlüsse.", "success");
   return true;
@@ -5304,10 +5561,14 @@ function renderDiagramBuilderWorkspace(session) {
   updateDiagramBuilderGridMetrics(session);
   session.connectorLayer = createSvgElement("svg", { class: "diagram-builder-connectors", "aria-hidden": "true" });
   session.surface.replaceChildren(session.connectorLayer, session.emptyHint);
-  session.emptyHint.hidden = session.placements.length > 0 || session.swimlanes.length > 0 || session.systemBoundaries.length > 0;
+  session.emptyHint.hidden = session.placements.length > 0
+    || session.swimlanes.length > 0
+    || session.systemBoundaries.length > 0
+    || session.sequenceFragments.length > 0;
 
   renderDiagramBuilderPalette(session);
   session.systemBoundaries.forEach((boundary) => session.surface.append(createDiagramBuilderSystemBoundaryNode(session, boundary)));
+  session.sequenceFragments.forEach((fragment) => session.surface.append(createDiagramBuilderSequenceFragmentNode(session, fragment)));
   session.swimlanes.forEach((swimlane) => session.surface.append(createDiagramBuilderSwimlaneNode(session, swimlane)));
   session.placements
     .filter((placement) => diagramBuilderIsSequenceParticipant(placement.piece))
@@ -5344,16 +5605,19 @@ function switchDiagramBuilderView(session, nextViewType) {
   session.finishConnectionEditing?.(true);
   session.finishSwimlaneEditing?.(true);
   session.finishSystemBoundaryEditing?.(true);
+  session.finishSequenceFragmentEditing?.(true);
   clearDiagramBuilderPlacementMode(session);
   clearDiagramBuilderConnectionMode(session);
   session.diagramStates.set(session.viewType, {
     placements: session.placements,
     swimlanes: session.swimlanes,
     systemBoundaries: session.systemBoundaries,
+    sequenceFragments: session.sequenceFragments,
     connections: session.connections,
     nextPlacementId: session.nextPlacementId,
     nextSwimlaneId: session.nextSwimlaneId,
     nextSystemBoundaryId: session.nextSystemBoundaryId,
+    nextSequenceFragmentId: session.nextSequenceFragmentId,
     nextConnectionId: session.nextConnectionId
   });
   const stored = session.diagramStates.get(nextViewType);
@@ -5361,14 +5625,17 @@ function switchDiagramBuilderView(session, nextViewType) {
   session.placements = stored?.placements || [];
   session.swimlanes = stored?.swimlanes || [];
   session.systemBoundaries = stored?.systemBoundaries || [];
+  session.sequenceFragments = stored?.sequenceFragments || [];
   session.connections = stored?.connections || [];
   session.nextPlacementId = stored?.nextPlacementId || 0;
   session.nextSwimlaneId = stored?.nextSwimlaneId || 0;
   session.nextSystemBoundaryId = stored?.nextSystemBoundaryId || 0;
+  session.nextSequenceFragmentId = stored?.nextSequenceFragmentId || 0;
   session.nextConnectionId = stored?.nextConnectionId || 0;
   session.selectedPlacementId = null;
   session.selectedSwimlaneId = null;
   session.selectedSystemBoundaryId = null;
+  session.selectedSequenceFragmentId = null;
   session.editingConnectionId = null;
   renderDiagramBuilderWorkspace(session);
   session.palette.scrollLeft = 0;
@@ -5423,6 +5690,7 @@ function createDiagramBuilderCodePane(file) {
 function closeDiagramBuilderMode() {
   if (!activeDiagramBuilderSession) return;
   activeDiagramBuilderSession.finishSystemBoundaryEditing?.(true);
+  activeDiagramBuilderSession.finishSequenceFragmentEditing?.(true);
   document.removeEventListener("keydown", activeDiagramBuilderSession.handleKeyDown, true);
   activeDiagramBuilderSession.resizeObserver?.disconnect();
   activeDiagramBuilderSession.overlay.remove();
@@ -5511,10 +5779,12 @@ function openDiagramBuilderMode(file) {
     placements: [],
     swimlanes: [],
     systemBoundaries: [],
+    sequenceFragments: [],
     connections: [],
     nextPlacementId: 0,
     nextSwimlaneId: 0,
     nextSystemBoundaryId: 0,
+    nextSequenceFragmentId: 0,
     nextConnectionId: 0,
     cellWidth: DIAGRAM_BUILDER_DEFAULT_CELL_WIDTH,
     cellHeight: DIAGRAM_BUILDER_DEFAULT_CELL_HEIGHT,
@@ -5523,6 +5793,7 @@ function openDiagramBuilderMode(file) {
     selectedPlacementId: null,
     selectedSwimlaneId: null,
     selectedSystemBoundaryId: null,
+    selectedSequenceFragmentId: null,
     armedPieceIndex: null,
     paletteDragging: false,
     previewCell: null,
@@ -5539,6 +5810,8 @@ function openDiagramBuilderMode(file) {
     finishSwimlaneEditing: null,
     editingSystemBoundaryId: null,
     finishSystemBoundaryEditing: null,
+    editingSequenceFragmentId: null,
+    finishSequenceFragmentEditing: null,
     toast,
     toastMessage,
     toastCancelButton,
@@ -5674,6 +5947,13 @@ function openDiagramBuilderMode(file) {
       session.finishSystemBoundaryEditing?.(event.key === "Enter");
       return;
     }
+    if (session.editingSequenceFragmentId) {
+      if (event.key !== "Enter" && event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      session.finishSequenceFragmentEditing?.(event.key === "Enter");
+      return;
+    }
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -5693,6 +5973,12 @@ function openDiagramBuilderMode(file) {
     if (session.selectedSystemBoundaryId) {
       session.systemBoundaries = session.systemBoundaries.filter((boundary) => boundary.id !== session.selectedSystemBoundaryId);
       session.selectedSystemBoundaryId = null;
+      renderDiagramBuilderWorkspace(session);
+      return;
+    }
+    if (session.selectedSequenceFragmentId) {
+      session.sequenceFragments = session.sequenceFragments.filter((fragment) => fragment.id !== session.selectedSequenceFragmentId);
+      session.selectedSequenceFragmentId = null;
       renderDiagramBuilderWorkspace(session);
       return;
     }
