@@ -2681,6 +2681,18 @@ function diagramBuilderDecisionTableRows(piece, key, fallbackValue) {
   }];
 }
 
+function diagramBuilderDecisionActionPortFraction(piece, metrics = diagramBuilderPieceMetrics(piece)) {
+  const conditionCount = diagramBuilderDecisionTableRows(piece, "conditions", "J").length;
+  const actionCount = diagramBuilderDecisionTableRows(piece, "actions", "-").length;
+  const headerHeight = 59;
+  const separatorHeight = 12;
+  const rowHeight = 34;
+  const tableHeight = headerHeight + (conditionCount + actionCount) * rowHeight + separatorHeight;
+  const topInset = Math.max(0, (metrics.elementHeight - tableHeight) / 2);
+  const actionCenter = topInset + headerHeight + conditionCount * rowHeight + separatorHeight + actionCount * rowHeight / 2;
+  return Math.max(0.1, Math.min(0.9, actionCenter / metrics.elementHeight));
+}
+
 function diagramBuilderPieceMetrics(piece) {
   const text = String(piece.label || "");
   const logicalLines = text.split("\n");
@@ -4099,6 +4111,10 @@ function diagramBuilderAutomaticSourceSides(session) {
     const targetSpan = diagramBuilderPlacementSpan(session, target.piece);
     const horizontalDistance = (target.column + targetSpan.columns / 2 - source.column - sourceSpan.columns / 2) * session.cellWidth;
     const verticalDistance = (target.row + targetSpan.rows / 2 - source.row - sourceSpan.rows / 2) * session.cellHeight;
+    if (source.piece.kind === "pap-decision-table") {
+      sides.set(connection.id, horizontalDistance < 0 ? "left" : "right");
+      return;
+    }
     if (session.viewType === "sequence") {
       sides.set(connection.id, horizontalDistance < 0 ? "left" : "right");
       return;
@@ -4505,12 +4521,20 @@ function drawDiagramBuilderConnections(session) {
         bottom: height - sourceBox.bottom,
         top: sourceBox.top
       };
-      const possibleSides = session.viewType === "sequence" ? ["right", "left"] : ["right", "left", "bottom", "top"];
+      const possibleSides = session.viewType === "sequence" || source.piece.kind === "pap-decision-table"
+        ? ["right", "left"]
+        : ["right", "left", "bottom", "top"];
       sourceSide = possibleSides.sort((left, right) => availableSpace[right] - availableSpace[left])[0];
     }
-    const fraction = isSelfConnection
-      ? Math.max(0.18, Math.min(0.46, 0.34 + selfConnectionSpread))
-      : sourcePortAssignments.get(connection.id) || 0.5;
+    const assignedSourceFraction = sourcePortAssignments.get(connection.id) || 0.5;
+    const decisionActionFraction = source.piece.kind === "pap-decision-table"
+      ? diagramBuilderDecisionActionPortFraction(source.piece)
+      : null;
+    const fraction = decisionActionFraction !== null
+      ? Math.max(0.1, Math.min(0.9, decisionActionFraction + (isSelfConnection ? -0.06 + selfConnectionSpread : assignedSourceFraction - 0.5)))
+      : isSelfConnection
+        ? Math.max(0.18, Math.min(0.46, 0.34 + selfConnectionSpread))
+        : assignedSourceFraction;
     const sourcePort = diagramBuilderPortOnBox(sourceBox, sourceSide, fraction, diagramBuilderIsDiamond(source.piece));
     const sourceSpan = diagramBuilderPlacementSpan(session, source.piece);
     const sourceBoundary = sourceSide === "left" || sourceSide === "right"
@@ -4537,9 +4561,11 @@ function drawDiagramBuilderConnections(session) {
     const laneOffsets = [0];
     for (let lane = 1; lane <= Math.max(8, session.connections.length); lane += 1) laneOffsets.push(-lane * 5, lane * 5);
     targetSides.forEach((targetSide, targetSideIndex) => {
-      const targetFraction = isSelfConnection
-        ? Math.max(0.54, Math.min(0.82, 0.66 - selfConnectionSpread))
-        : targetPortAssignments.get(connection.id) || 0.5;
+      const targetFraction = isSelfConnection && target.piece.kind === "pap-decision-table"
+        ? Math.max(0.1, Math.min(0.9, diagramBuilderDecisionActionPortFraction(target.piece) + 0.06 - selfConnectionSpread))
+        : isSelfConnection
+          ? Math.max(0.54, Math.min(0.82, 0.66 - selfConnectionSpread))
+          : targetPortAssignments.get(connection.id) || 0.5;
       const targetPort = diagramBuilderPortOnBox(targetBox, targetSide, targetFraction, diagramBuilderIsDiamond(target.piece));
       const targetSpan = diagramBuilderPlacementSpan(session, target.piece);
       const targetBoundary = targetSide === "left" || targetSide === "right"
@@ -4746,7 +4772,9 @@ function createDiagramBuilderPlacedNode(session, placement) {
     bottom: centerY + pieceMetrics.elementHeight / 2
   };
   const isDiamond = diagramBuilderIsDiamond(placement.piece);
-  const connectionHandleSides = session.viewType === "sequence"
+  const connectionHandleSides = placement.piece.kind === "pap-decision-table"
+    ? [["right", "→"], ["left", "←"]]
+    : session.viewType === "sequence"
     ? (placement.piece.kind === "sequence-activation" ? [["right", "→"], ["left", "←"]] : [])
     : [
     ["top", "↑"],
@@ -4755,7 +4783,9 @@ function createDiagramBuilderPlacedNode(session, placement) {
     ["left", "←"]
   ];
   connectionHandleSides.forEach(([side, icon]) => {
-    const fraction = 0.5;
+    const fraction = placement.piece.kind === "pap-decision-table"
+      ? diagramBuilderDecisionActionPortFraction(placement.piece, pieceMetrics)
+      : 0.5;
     const port = diagramBuilderPortOnBox(handleBox, side, fraction, isDiamond);
     const left = port.x + (side === "left" ? -8 : side === "right" ? 8 : 0);
     const top = port.y + (side === "top" ? -8 : side === "bottom" ? 8 : 0);
