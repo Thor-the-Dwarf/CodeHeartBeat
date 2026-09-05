@@ -3727,7 +3727,7 @@ function openDiagramBuilderEndpointMenu(session, connection, endpoint, clientX, 
     button.type = "button";
     button.title = label;
     button.setAttribute("aria-label", label);
-    const previewType = value === "control" && session.viewType === "activity" ? "activity-open" : value;
+    const previewType = value === "control" && ["activity", "state"].includes(session.viewType) ? "activity-open" : value;
     button.append(
       createElement("span", `diagram-builder-marker-preview ${previewType}`),
       createElement("span", "diagram-builder-marker-label", label)
@@ -4066,7 +4066,7 @@ function drawDiagramBuilderConnections(session) {
       d: pathData
     };
     const markerUrl = (markerType) => ({
-      control: session.viewType === "activity"
+      control: ["activity", "state"].includes(session.viewType)
         ? "url(#diagram-builder-activity-arrowhead)"
         : "url(#diagram-builder-arrowhead)",
       inheritance: "url(#diagram-builder-inheritance)",
