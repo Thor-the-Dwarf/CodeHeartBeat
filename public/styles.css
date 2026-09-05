@@ -3236,17 +3236,32 @@ body.folder-tree-resizing {
 .diagram-builder-palette-item.pap-start,
 .diagram-builder-palette-item.pap-end {
   border-radius: 999px;
-  border-color: #9fb4c9;
-  background: #203047;
+  border-color: #6f9dcb;
+  background: rgba(33, 78, 127, 0.78);
 }
 
+.diagram-builder-piece.pap-input,
+.diagram-builder-palette-item.pap-input,
 .diagram-builder-piece.pap-output,
 .diagram-builder-palette-item.pap-output {
   border: 0;
   border-radius: 0;
-  background: #20344a;
+}
+
+.diagram-builder-piece.pap-input,
+.diagram-builder-palette-item.pap-input {
+  color: #dff8e8;
+  background: rgba(33, 112, 72, 0.72);
   clip-path: polygon(9% 0, 100% 0, 91% 100%, 0 100%);
-  box-shadow: inset 0 0 0 1px #9fb4c9;
+  box-shadow: inset 0 0 0 1px #65c58b;
+}
+
+.diagram-builder-piece.pap-output,
+.diagram-builder-palette-item.pap-output {
+  color: #ffe2e5;
+  background: rgba(133, 45, 58, 0.72);
+  clip-path: polygon(0 0, 91% 0, 100% 100%, 9% 100%);
+  box-shadow: inset 0 0 0 1px #df7582;
 }
 
 .diagram-builder-piece.pap-decision-table,
@@ -3284,7 +3299,7 @@ body.folder-tree-resizing {
   min-height: 30px;
   border-bottom: 1px solid #4d83c4;
   color: #fff0a7;
-  background: #5b510d;
+  background: rgba(48, 39, 26, 0.82);
   place-items: center;
 }
 
@@ -3292,7 +3307,7 @@ body.folder-tree-resizing {
   min-height: 22px;
   border-right: 1px solid #697588;
   border-bottom: 1px solid #697588;
-  background: #162335;
+  background: rgba(28, 59, 91, 0.72);
 }
 
 .diagram-builder-decision-preview-cell:nth-last-child(-n + 4) {
@@ -3337,7 +3352,7 @@ body.folder-tree-resizing {
 .diagram-builder-decision-title {
   width: 216px;
   color: #fff0a7;
-  background: #5b510d;
+  background: rgba(48, 39, 26, 0.82);
   font-size: 10px;
   text-align: left !important;
 }
@@ -3345,7 +3360,7 @@ body.folder-tree-resizing {
 .diagram-builder-decision-rules-title {
   height: 30px !important;
   color: #dbeaff;
-  background: #173b69;
+  background: rgba(23, 59, 105, 0.76);
   text-align: left !important;
 }
 
@@ -3403,7 +3418,7 @@ body.folder-tree-resizing {
 
 .diagram-builder-decision-rule-head,
 .diagram-builder-decision-row-label {
-  background: #214e7f;
+  background: rgba(33, 78, 127, 0.78);
 }
 
 .diagram-builder-decision-rule-head {
@@ -3417,7 +3432,7 @@ body.folder-tree-resizing {
   width: 24px;
   padding: 3px 1px !important;
   color: #fff0a7;
-  background: #5b510d;
+  background: rgba(48, 39, 26, 0.82);
 }
 
 .diagram-builder-decision-group-label {
@@ -3432,7 +3447,7 @@ body.folder-tree-resizing {
 .diagram-builder-decision-label-cell {
   overflow: hidden;
   color: #e4efff;
-  background: #214e7f;
+  background: rgba(33, 78, 127, 0.78);
   font-weight: 600;
   text-align: left !important;
   text-overflow: ellipsis;
@@ -3997,8 +4012,7 @@ body.folder-tree-resizing {
   outline: none;
 }
 
-.diagram-builder-piece.output,
-.diagram-builder-piece.pap-output {
+.diagram-builder-piece.output {
   min-width: 190px;
   border: 0;
   border-radius: 0;
