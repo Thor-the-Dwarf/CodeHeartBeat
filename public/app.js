@@ -4205,6 +4205,74 @@ function diagramBuilderTargetPortAssignments(session, sourceSides) {
   return assignments;
 }
 
+function diagramBuilderIsUseCaseDependency(session, connection) {
+  if (session.viewType !== "usecase") return false;
+  const source = session.placements.find((placement) => placement.id === connection.sourceId);
+  const target = session.placements.find((placement) => placement.id === connection.targetId);
+  return source?.piece.kind === "usecase" && target?.piece.kind === "usecase";
+}
+
+function beginDiagramBuilderUseCaseDependencyEdit(session, connection, clientX, clientY) {
+  session.finishConnectionEditing?.(true);
+  session.finishSystemBoundaryEditing?.(true);
+  session.finishSequenceFragmentEditing?.(true);
+  const original = {
+    relation: connection.useCaseRelation || "include",
+    label: connection.label || "",
+    sourceId: connection.sourceId,
+    targetId: connection.targetId
+  };
+  const editor = createElement("div", "diagram-builder-usecase-relation-editor");
+  editor.setAttribute("role", "dialog");
+  editor.setAttribute("aria-label", "Beziehung zwischen Anwendungsfällen bearbeiten");
+  editor.style.left = `${Math.max(120, Math.min(window.innerWidth - 120, clientX))}px`;
+  editor.style.top = `${Math.max(62, Math.min(window.innerHeight - 62, clientY))}px`;
+  const relation = createElement("select", "diagram-builder-usecase-relation-select");
+  relation.setAttribute("aria-label", "Art der Anwendungsfallbeziehung");
+  relation.append(
+    new Option("Includes («include»)", "include", false, original.relation === "include"),
+    new Option("Extends («extend»)", "extend", false, original.relation === "extend")
+  );
+  const label = createElement("input", "diagram-builder-usecase-relation-input");
+  label.type = "text";
+  label.value = original.label;
+  label.placeholder = "Zusatzbeschriftung (optional)";
+  label.setAttribute("aria-label", "Zusatzbeschriftung der Anwendungsfallbeziehung");
+  editor.append(relation, label);
+  session.overlay.append(editor);
+  session.editingConnectionId = connection.id;
+  let finished = false;
+  session.finishConnectionEditing = (save) => {
+    if (finished) return;
+    finished = true;
+    if (save) {
+      connection.useCaseRelation = relation.value;
+      connection.label = label.value.trim();
+    } else {
+      connection.useCaseRelation = original.relation;
+      connection.label = original.label;
+      connection.sourceId = original.sourceId;
+      connection.targetId = original.targetId;
+    }
+    editor.remove();
+    session.overlay.querySelectorAll(".diagram-builder-endpoint-control, .diagram-builder-endpoint-menu").forEach((item) => item.remove());
+    session.editingConnectionId = null;
+    session.finishConnectionEditing = null;
+    drawDiagramBuilderConnections(session);
+    setDiagramBuilderStatus(session, save ? "Anwendungsfallbeziehung übernommen." : "Pfeilbearbeitung abgebrochen.", save ? "success" : "");
+  };
+  editor.addEventListener("focusout", () => {
+    window.setTimeout(() => {
+      if (!editor.isConnected) return;
+      const focused = document.activeElement;
+      if (focused?.closest?.(".diagram-builder-endpoint-control")) return;
+      if (!editor.contains(focused)) session.finishConnectionEditing?.(true);
+    }, 0);
+  });
+  relation.focus({ preventScroll: true });
+  drawDiagramBuilderConnections(session);
+}
+
 function beginDiagramBuilderConnectionLabelEdit(session, connection, clientX, clientY) {
   session.finishConnectionEditing?.(true);
   session.finishSystemBoundaryEditing?.(true);
@@ -4299,6 +4367,7 @@ function openDiagramBuilderEndpointMenu(session, connection, endpoint, clientX, 
 
 function renderDiagramBuilderEndpointControls(session, connection, route, surfaceRect) {
   if (session.editingConnectionId !== connection.id) return;
+  const fixedUseCaseDependency = diagramBuilderIsUseCaseDependency(session, connection);
   const endpoints = [
     ["start", route.points[0]],
     ["end", route.points[route.points.length - 1]]
@@ -4310,7 +4379,9 @@ function renderDiagramBuilderEndpointControls(session, connection, route, surfac
     control.type = "button";
     control.style.left = `${surfaceRect.left + point.x * zoom}px`;
     control.style.top = `${surfaceRect.top + point.y * zoom}px`;
-    control.title = `${endpoint === "start" ? "Pfeilanfang" : "Pfeilende"} verschieben oder Pfeilspitze wählen`;
+    control.title = fixedUseCaseDependency
+      ? `${endpoint === "start" ? "Pfeilanfang" : "Pfeilende"} verschieben`
+      : `${endpoint === "start" ? "Pfeilanfang" : "Pfeilende"} verschieben oder Pfeilspitze wählen`;
     control.setAttribute("aria-label", control.title);
     let endpointDrag = null;
     let suppressClick = false;
@@ -4356,7 +4427,7 @@ function renderDiagramBuilderEndpointControls(session, connection, route, surfac
         setDiagramBuilderStatus(session, `${endpoint === "start" ? "Pfeilanfang" : "Pfeilende"} wurde neu verbunden.`, "success");
       }
       drawDiagramBuilderConnections(session);
-      session.overlay.querySelector(".diagram-builder-connection-label-editor")?.focus({ preventScroll: true });
+      session.overlay.querySelector(".diagram-builder-connection-label-editor, .diagram-builder-usecase-relation-input")?.focus({ preventScroll: true });
       window.setTimeout(() => { suppressClick = false; }, 0);
     };
     const cancelEndpoint = (event) => finishEndpoint(event, true);
@@ -4376,6 +4447,7 @@ function renderDiagramBuilderEndpointControls(session, connection, route, surfac
       event.preventDefault();
       event.stopPropagation();
       if (suppressClick) return;
+      if (fixedUseCaseDependency) return;
       openDiagramBuilderEndpointMenu(session, connection, endpoint, event.clientX, event.clientY);
     });
     session.overlay.append(control);
@@ -4495,6 +4567,8 @@ function drawDiagramBuilderConnections(session) {
     const sourceNode = session.surface.querySelector(`[data-placement-id="${connection.sourceId}"] .diagram-builder-piece`);
     const targetNode = session.surface.querySelector(`[data-placement-id="${connection.targetId}"] .diagram-builder-piece`);
     if (!source || !target || !sourceNode || !targetNode) return;
+    const isUseCaseDependency = diagramBuilderIsUseCaseDependency(session, connection);
+    if (isUseCaseDependency && !["include", "extend"].includes(connection.useCaseRelation)) connection.useCaseRelation = "include";
     const sourceRect = sourceNode.getBoundingClientRect();
     const targetRect = targetNode.getBoundingClientRect();
     const isSelfConnection = source.id === target.id;
@@ -4660,7 +4734,7 @@ function drawDiagramBuilderConnections(session) {
       .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
       .join(" ");
     const pathAttributes = {
-      class: "diagram-builder-connector editable",
+      class: `diagram-builder-connector editable${isUseCaseDependency ? " usecase-dependency" : ""}`,
       d: pathData
     };
     const markerUrl = (markerType) => ({
@@ -4671,8 +4745,10 @@ function drawDiagramBuilderConnections(session) {
       aggregation: "url(#diagram-builder-aggregation)",
       composition: "url(#diagram-builder-composition)"
     })[markerType];
-    const startMarkerUrl = markerUrl(connection.startMarker || "none");
-    const endMarkerUrl = markerUrl(connection.endMarker || "control");
+    const startMarkerUrl = isUseCaseDependency ? null : markerUrl(connection.startMarker || "none");
+    const endMarkerUrl = isUseCaseDependency
+      ? "url(#diagram-builder-activity-arrowhead)"
+      : markerUrl(connection.endMarker || "control");
     if (startMarkerUrl) pathAttributes["marker-start"] = startMarkerUrl;
     if (endMarkerUrl) pathAttributes["marker-end"] = endMarkerUrl;
     const connectionGroup = createSvgElement("g", {
@@ -4687,11 +4763,15 @@ function drawDiagramBuilderConnections(session) {
     connectionGroup.addEventListener("dblclick", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      beginDiagramBuilderConnectionLabelEdit(session, connection, event.clientX, event.clientY);
+      if (isUseCaseDependency) beginDiagramBuilderUseCaseDependencyEdit(session, connection, event.clientX, event.clientY);
+      else beginDiagramBuilderConnectionLabelEdit(session, connection, event.clientX, event.clientY);
     });
     connectionGroup.append(hitPath, path);
     layer.append(connectionGroup);
-    if (connection.label) {
+    const visibleConnectionLabel = isUseCaseDependency
+      ? `«${connection.useCaseRelation}»${connection.label ? ` ${connection.label}` : ""}`
+      : connection.label;
+    if (visibleConnectionLabel) {
       const labelSegment = [...route.segments].sort((left, right) => {
         const leftLength = Math.abs(left.to.x - left.from.x) + Math.abs(left.to.y - left.from.y);
         const rightLength = Math.abs(right.to.x - right.from.x) + Math.abs(right.to.y - right.from.y);
@@ -4704,7 +4784,7 @@ function drawDiagramBuilderConnections(session) {
         y: verticalLabel ? (labelSegment.from.y + labelSegment.to.y) / 2 : labelSegment.from.y - 6,
         "text-anchor": "middle"
       });
-      label.textContent = connection.label;
+      label.textContent = visibleConnectionLabel;
       connectionGroup.append(label);
     }
     renderDiagramBuilderEndpointControls(session, connection, route, surfaceRect);
@@ -4734,6 +4814,10 @@ function createDiagramBuilderPlacedNode(session, placement) {
 
   const selectNode = (event) => {
     if (session.pendingConnection) {
+      const source = session.placements.find((item) => item.id === session.pendingConnection.sourceId);
+      const isUseCaseDependency = session.viewType === "usecase"
+        && source?.piece.kind === "usecase"
+        && placement.piece.kind === "usecase";
       session.connections.push({
         id: ++session.nextConnectionId,
         sourceId: session.pendingConnection.sourceId,
@@ -4741,7 +4825,8 @@ function createDiagramBuilderPlacedNode(session, placement) {
         type: session.pendingConnection.type,
         label: session.pendingConnection.label,
         startMarker: session.pendingConnection.startMarker,
-        endMarker: session.pendingConnection.endMarker
+        endMarker: session.pendingConnection.endMarker,
+        ...(isUseCaseDependency ? { useCaseRelation: "include" } : {})
       });
       clearDiagramBuilderConnectionMode(session);
       setDiagramBuilderStatus(session, "Verbindung erstellt. Beim Hover erscheinen neue Anschlüsse.", "success");

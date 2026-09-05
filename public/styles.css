@@ -3360,6 +3360,10 @@ body.folder-tree-resizing {
   stroke-dasharray: 5 3;
 }
 
+.diagram-builder-connector.usecase-dependency {
+  stroke-dasharray: 7 5;
+}
+
 .diagram-builder-connector-label {
   stroke: #0a0810;
   stroke-width: 4px;
@@ -3391,6 +3395,40 @@ body.folder-tree-resizing {
   font: 600 10px/1.3 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
   text-align: center;
   transform: translate(-50%, -50%);
+}
+
+.diagram-builder-usecase-relation-editor {
+  position: fixed;
+  z-index: 1090;
+  display: grid;
+  gap: 8px;
+  width: 240px;
+  padding: 10px;
+  border: 1px solid #74518a;
+  border-radius: 7px;
+  background: rgba(22, 16, 29, 0.99);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.56), 0 0 0 2px rgba(199, 125, 255, 0.12);
+  transform: translate(-50%, 12px);
+}
+
+.diagram-builder-usecase-relation-select,
+.diagram-builder-usecase-relation-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid #526a82;
+  border-radius: 4px;
+  color: #f5f8fd;
+  background: #0b111a;
+  outline: none;
+  font: 700 9px/1.2 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.diagram-builder-usecase-relation-select:focus,
+.diagram-builder-usecase-relation-input:focus {
+  border-color: #c77dff;
+  box-shadow: 0 0 0 2px rgba(199, 125, 255, 0.16);
 }
 
 .diagram-builder-endpoint-control {
