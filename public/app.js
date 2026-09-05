@@ -2605,7 +2605,7 @@ function createDiagramBuilderPieces(file) {
     diagramBuilderPiece("activity-action", "Aktion"),
     diagramBuilderPiece("activity-decision", "Entscheidung"),
     diagramBuilderPiece("activity-end", "Ende"),
-    { ...diagramBuilderPiece("activity-swimlane", "Swimlane"), defaultLabel: file?.name?.replace(/\.java$/i, "") || "Klasse" }
+    diagramBuilderPiece("activity-swimlane", "Swimlane")
   ];
 }
 
@@ -3769,13 +3769,30 @@ function createDiagramBuilderSwimlaneBoundary(session, swimlane, side, laneNode)
 }
 
 function createDiagramBuilderSwimlaneNode(session, swimlane) {
-  const lane = createElement("section", `diagram-builder-swimlane${session.editingSwimlaneId === swimlane.id ? " editing" : ""}`);
+  const lane = createElement(
+    "section",
+    `diagram-builder-swimlane${session.editingSwimlaneId === swimlane.id ? " editing" : ""}${session.selectedSwimlaneId === swimlane.id ? " selected" : ""}`
+  );
   lane.dataset.swimlaneId = String(swimlane.id);
+  lane.setAttribute("aria-label", swimlane.label ? `Swimlane ${swimlane.label}` : "Unbenannte Swimlane");
+  lane.title = "Doppelklick zum Bearbeiten der Swimlane";
   applyDiagramBuilderSwimlaneGeometry(session, swimlane, lane);
+  lane.addEventListener("click", () => {
+    session.selectedSwimlaneId = swimlane.id;
+    session.surface.querySelectorAll(".diagram-builder-swimlane.selected").forEach((item) => item.classList.remove("selected"));
+    lane.classList.add("selected");
+  });
+  lane.addEventListener("dblclick", (event) => {
+    if (session.editingSwimlaneId === swimlane.id) return;
+    event.preventDefault();
+    event.stopPropagation();
+    beginDiagramBuilderSwimlaneEdit(session, swimlane);
+  });
   if (session.editingSwimlaneId === swimlane.id) {
     const editor = createElement("input", "diagram-builder-swimlane-label-editor");
     editor.type = "text";
     editor.value = swimlane.label;
+    editor.placeholder = "Bezeichnung (optional)";
     editor.setAttribute("aria-label", "Bezeichnung der Swimlane bearbeiten");
     editor.addEventListener("blur", () => {
       window.setTimeout(() => {
@@ -3792,7 +3809,7 @@ function createDiagramBuilderSwimlaneNode(session, swimlane) {
     const label = createElement("button", "diagram-builder-swimlane-label", swimlane.label);
     label.type = "button";
     label.title = "Doppelklick zum Bearbeiten";
-    label.setAttribute("aria-label", `${swimlane.label}; Swimlane doppelklicken zum Bearbeiten`);
+    label.setAttribute("aria-label", `${swimlane.label || "Unbenannte Swimlane"}; doppelklicken zum Bearbeiten`);
     label.addEventListener("click", () => { session.selectedSwimlaneId = swimlane.id; });
     label.addEventListener("dblclick", (event) => {
       event.preventDefault();
@@ -3809,7 +3826,7 @@ function addDiagramBuilderSwimlane(session, piece, column) {
   const leftColumn = Math.min(columns - 1, Math.max(0, column));
   const swimlane = {
     id: ++session.nextSwimlaneId,
-    label: piece.defaultLabel || "Klasse",
+    label: "",
     leftColumn,
     rightColumn: Math.min(columns, leftColumn + 1)
   };
