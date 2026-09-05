@@ -2662,6 +2662,8 @@ function highlightDiagramBuilderCodeLine(session, lineIndex) {
 
 const DIAGRAM_BUILDER_DEFAULT_CELL_WIDTH = 140;
 const DIAGRAM_BUILDER_DEFAULT_CELL_HEIGHT = 100;
+const DIAGRAM_BUILDER_CLASS_CELL_WIDTH = 210;
+const DIAGRAM_BUILDER_CLASS_CELL_HEIGHT = 130;
 
 function diagramBuilderPieceMetrics(piece) {
   const text = String(piece.label || "");
@@ -2735,23 +2737,44 @@ function applyDiagramBuilderPieceMetrics(node, piece) {
   return metrics;
 }
 
+function diagramBuilderPlacementSpan(session, piece) {
+  if (session.viewType !== "class" || !diagramBuilderIsClassifier(piece)) return { columns: 1, rows: 1 };
+  const metrics = diagramBuilderPieceMetrics(piece);
+  return {
+    columns: Math.max(1, Math.ceil(metrics.visualWidth / session.cellWidth)),
+    rows: Math.max(1, Math.ceil(metrics.visualHeight / session.cellHeight))
+  };
+}
+
+function applyDiagramBuilderPlacementSpan(session, piece, cell) {
+  const span = diagramBuilderPlacementSpan(session, piece);
+  cell.style.width = `${span.columns * session.cellWidth}px`;
+  cell.style.height = `${span.rows * session.cellHeight}px`;
+  return span;
+}
+
 function updateDiagramBuilderGridMetrics(session) {
-  const metrics = session.placements
-    .filter((placement) => placement.piece.kind !== "sequence-activation")
-    .map((placement) => diagramBuilderPieceMetrics(placement.piece));
-  const largestWidth = metrics.length ? Math.max(...metrics.map((item) => item.visualWidth)) : 0;
-  const largestHeight = metrics.length ? Math.max(...metrics.map((item) => item.visualHeight)) : 0;
-  session.cellWidth = Math.max(DIAGRAM_BUILDER_DEFAULT_CELL_WIDTH, Math.ceil((largestWidth + 28) / 10) * 10);
-  session.cellHeight = Math.max(DIAGRAM_BUILDER_DEFAULT_CELL_HEIGHT, Math.ceil((largestHeight + 28) / 10) * 10);
+  if (session.viewType === "class") {
+    session.cellWidth = DIAGRAM_BUILDER_CLASS_CELL_WIDTH;
+    session.cellHeight = DIAGRAM_BUILDER_CLASS_CELL_HEIGHT;
+  } else {
+    const metrics = session.placements
+      .filter((placement) => placement.piece.kind !== "sequence-activation")
+      .map((placement) => diagramBuilderPieceMetrics(placement.piece));
+    const largestWidth = metrics.length ? Math.max(...metrics.map((item) => item.visualWidth)) : 0;
+    const largestHeight = metrics.length ? Math.max(...metrics.map((item) => item.visualHeight)) : 0;
+    session.cellWidth = Math.max(DIAGRAM_BUILDER_DEFAULT_CELL_WIDTH, Math.ceil((largestWidth + 28) / 10) * 10);
+    session.cellHeight = Math.max(DIAGRAM_BUILDER_DEFAULT_CELL_HEIGHT, Math.ceil((largestHeight + 28) / 10) * 10);
+  }
   const maximumColumn = Math.max(
     0,
-    ...session.placements.map((placement) => placement.column),
+    ...session.placements.map((placement) => placement.column + diagramBuilderPlacementSpan(session, placement.piece).columns - 1),
     ...session.swimlanes.map((swimlane) => swimlane.rightColumn - 1),
     ...session.systemBoundaries.map((boundary) => boundary.rightColumn - 1)
   );
   const maximumRow = Math.max(
     0,
-    ...session.placements.map((placement) => placement.row),
+    ...session.placements.map((placement) => placement.row + diagramBuilderPlacementSpan(session, placement.piece).rows - 1),
     ...session.systemBoundaries.map((boundary) => boundary.bottomRow - 1),
     ...session.placements
       .filter((placement) => diagramBuilderIsSequenceParticipant(placement.piece))
@@ -2775,7 +2798,26 @@ function diagramBuilderCellFromPoint(session, clientX, clientY) {
 }
 
 function diagramBuilderPlacementAt(session, row, column, ignoredId = null) {
-  return session.placements.find((placement) => placement.id !== ignoredId && placement.row === row && placement.column === column);
+  return session.placements.find((placement) => {
+    if (placement.id === ignoredId) return false;
+    const span = diagramBuilderPlacementSpan(session, placement.piece);
+    return column >= placement.column
+      && column < placement.column + span.columns
+      && row >= placement.row
+      && row < placement.row + span.rows;
+  });
+}
+
+function diagramBuilderPlacementOverlaps(session, piece, row, column, ignoredId = null) {
+  const candidateSpan = diagramBuilderPlacementSpan(session, piece);
+  return session.placements.some((placement) => {
+    if (placement.id === ignoredId) return false;
+    const placedSpan = diagramBuilderPlacementSpan(session, placement.piece);
+    return column < placement.column + placedSpan.columns
+      && column + candidateSpan.columns > placement.column
+      && row < placement.row + placedSpan.rows
+      && row + candidateSpan.rows > placement.row;
+  });
 }
 
 function diagramBuilderLifelineCoversCell(participant, row, column) {
@@ -2793,7 +2835,7 @@ function diagramBuilderActivationHasLifeline(session, row, column, participantOv
 
 function diagramBuilderCanPlacePiece(session, piece, row, column, ignoredId = null) {
   if (piece.kind === "boundary") return true;
-  if (diagramBuilderPlacementAt(session, row, column, ignoredId)) return false;
+  if (diagramBuilderPlacementOverlaps(session, piece, row, column, ignoredId)) return false;
   if (piece.kind === "sequence-activation") return diagramBuilderActivationHasLifeline(session, row, column);
   if (!diagramBuilderIsSequenceParticipant(piece) || !ignoredId) return true;
   const override = { id: ignoredId, piece, row, column };
@@ -2868,6 +2910,7 @@ function updateDiagramBuilderCursorPiece(session, clientX, clientY) {
   if (floatingPreview) floatingPreview.hidden = true;
   preview.style.left = `${cell.column * session.cellWidth}px`;
   preview.style.top = `${cell.row * session.cellHeight}px`;
+  applyDiagramBuilderPlacementSpan(session, piece, preview);
   preview.classList.toggle("invalid", !diagramBuilderCanPlacePiece(session, piece, cell.row, cell.column));
 }
 
@@ -2894,6 +2937,7 @@ function updateDiagramBuilderRepositionPreview(session, clientX, clientY) {
   session.surface.classList.add("repositioning-piece");
   preview.style.left = `${cell.column * session.cellWidth}px`;
   preview.style.top = `${cell.row * session.cellHeight}px`;
+  applyDiagramBuilderPlacementSpan(session, placement.piece, preview);
   preview.classList.toggle("invalid", !diagramBuilderCanPlacePiece(session, placement.piece, cell.row, cell.column, placement.id));
 }
 
@@ -3127,15 +3171,21 @@ function beginDiagramBuilderClassifierEdit(session, placement, node) {
   let finished = false;
   session.finishEditing = (save) => {
     if (finished) return;
-    finished = true;
     if (save) {
-      piece.label = nameInput.value.trim();
-      if (piece.kind === "class-enum") piece.literals = sections.literals.values();
-      else {
-        piece.attributes = sections.attributes.values();
-        piece.methods = sections.methods.values();
+      const editedPiece = {
+        ...piece,
+        label: nameInput.value.trim(),
+        attributes: piece.kind === "class-enum" ? original.attributes : sections.attributes.values(),
+        methods: piece.kind === "class-enum" ? original.methods : sections.methods.values(),
+        literals: piece.kind === "class-enum" ? sections.literals.values() : original.literals
+      };
+      if (!diagramBuilderCanPlacePiece(session, editedPiece, placement.row, placement.column, placement.id)) {
+        setDiagramBuilderStatus(session, "Die vergrößerte Klasse benötigt freie Rasterplätze. Verschiebe zuerst das benachbarte Element.", "error");
+        return;
       }
+      Object.assign(piece, editedPiece);
     } else Object.assign(piece, original);
+    finished = true;
     session.editingPlacementId = null;
     session.finishEditing = null;
     renderDiagramBuilderWorkspace(session);
@@ -3515,8 +3565,10 @@ function diagramBuilderAutomaticSourceSides(session) {
     const source = session.placements.find((placement) => placement.id === connection.sourceId);
     const target = session.placements.find((placement) => placement.id === connection.targetId);
     if (!source || !target) return;
-    const horizontalDistance = (target.column - source.column) * session.cellWidth;
-    const verticalDistance = (target.row - source.row) * session.cellHeight;
+    const sourceSpan = diagramBuilderPlacementSpan(session, source.piece);
+    const targetSpan = diagramBuilderPlacementSpan(session, target.piece);
+    const horizontalDistance = (target.column + targetSpan.columns / 2 - source.column - sourceSpan.columns / 2) * session.cellWidth;
+    const verticalDistance = (target.row + targetSpan.rows / 2 - source.row - sourceSpan.rows / 2) * session.cellHeight;
     if (session.viewType === "sequence") {
       sides.set(connection.id, horizontalDistance < 0 ? "left" : "right");
       return;
@@ -3910,9 +3962,10 @@ function drawDiagramBuilderConnections(session) {
       bottom: (targetRect.bottom - surfaceRect.top) / zoom
     };
     const sourcePort = diagramBuilderPortOnBox(sourceBox, sourceSide, fraction, diagramBuilderIsDiamond(source.piece));
+    const sourceSpan = diagramBuilderPlacementSpan(session, source.piece);
     const sourceBoundary = sourceSide === "left" || sourceSide === "right"
-      ? { x: (source.column + (sourceSide === "right" ? 1 : 0)) * session.cellWidth, y: sourcePort.y }
-      : { x: sourcePort.x, y: (source.row + (sourceSide === "bottom" ? 1 : 0)) * session.cellHeight };
+      ? { x: (source.column + (sourceSide === "right" ? sourceSpan.columns : 0)) * session.cellWidth, y: sourcePort.y }
+      : { x: sourcePort.x, y: (source.row + (sourceSide === "bottom" ? sourceSpan.rows : 0)) * session.cellHeight };
     const preferredTargetSide = sourceSide === "left"
       ? "right"
       : sourceSide === "right"
@@ -3927,9 +3980,10 @@ function drawDiagramBuilderConnections(session) {
     targetSides.forEach((targetSide, targetSideIndex) => {
       const targetFraction = targetPortAssignments.get(connection.id) || 0.5;
       const targetPort = diagramBuilderPortOnBox(targetBox, targetSide, targetFraction, diagramBuilderIsDiamond(target.piece));
+      const targetSpan = diagramBuilderPlacementSpan(session, target.piece);
       const targetBoundary = targetSide === "left" || targetSide === "right"
-        ? { x: (target.column + (targetSide === "right" ? 1 : 0)) * session.cellWidth, y: targetPort.y }
-        : { x: targetPort.x, y: (target.row + (targetSide === "bottom" ? 1 : 0)) * session.cellHeight };
+        ? { x: (target.column + (targetSide === "right" ? targetSpan.columns : 0)) * session.cellWidth, y: targetPort.y }
+        : { x: targetPort.x, y: (target.row + (targetSide === "bottom" ? targetSpan.rows : 0)) * session.cellHeight };
       const addRouteCandidate = (points, routeIndex, laneOffset, detour = false) => {
         const compactPoints = diagramBuilderCompactOrthogonalPath(points);
         const segments = compactPoints.slice(1).map((point, index) => ({ from: compactPoints[index], to: point }));
@@ -3979,8 +4033,8 @@ function drawDiagramBuilderConnections(session) {
 
       const sourceIsHorizontal = sourceSide === "left" || sourceSide === "right";
       const detourGridLines = sourceIsHorizontal
-        ? [source.row * session.cellHeight, (source.row + 1) * session.cellHeight]
-        : [source.column * session.cellWidth, (source.column + 1) * session.cellWidth];
+        ? [source.row * session.cellHeight, (source.row + sourceSpan.rows) * session.cellHeight]
+        : [source.column * session.cellWidth, (source.column + sourceSpan.columns) * session.cellWidth];
       detourGridLines.forEach((gridLine, detourIndex) => {
         laneOffsets.forEach((laneOffset) => {
           const detourLine = gridLine + laneOffset;
@@ -4064,6 +4118,7 @@ function createDiagramBuilderPlacedNode(session, placement) {
   cell.dataset.placementId = String(placement.id);
   cell.style.left = `${placement.column * session.cellWidth}px`;
   cell.style.top = `${placement.row * session.cellHeight}px`;
+  const placementSpan = applyDiagramBuilderPlacementSpan(session, placement.piece, cell);
   cell.draggable = false;
   const node = createElement("div", `diagram-builder-piece ${placement.piece.kind}`);
   node.draggable = false;
@@ -4108,8 +4163,8 @@ function createDiagramBuilderPlacedNode(session, placement) {
   });
   cell.addEventListener("contextmenu", (event) => event.preventDefault());
   const handles = createElement("div", "diagram-builder-connection-handles");
-  const centerX = session.cellWidth / 2;
-  const centerY = session.cellHeight / 2;
+  const centerX = placementSpan.columns * session.cellWidth / 2;
+  const centerY = placementSpan.rows * session.cellHeight / 2;
   const handleBox = {
     left: centerX - pieceMetrics.elementWidth / 2,
     right: centerX + pieceMetrics.elementWidth / 2,
