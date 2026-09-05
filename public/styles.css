@@ -2276,15 +2276,6 @@ body.folder-tree-resizing {
   background: #202838;
 }
 
-.diagram-builder-piece.sequence-object::after {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  height: calc(var(--builder-cell-height, 100px) / 2);
-  border-left: 1px dashed #7c8da3;
-  content: "";
-}
-
 .diagram-builder-piece.sequence-activation,
 .diagram-builder-palette-item.sequence-activation {
   min-width: 14px;
@@ -2309,6 +2300,95 @@ body.folder-tree-resizing {
   width: 120px;
   color: #cfd7e5;
   transform: translateX(-50%);
+}
+
+.diagram-builder-sequence-lifeline {
+  position: absolute;
+  z-index: 0;
+  width: 0;
+  border-left: 1px dashed rgba(189, 200, 216, 0.72);
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.diagram-builder-sequence-destruction {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, 50%);
+}
+
+.diagram-builder-sequence-destruction::before,
+.diagram-builder-sequence-destruction::after {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  width: 18px;
+  height: 2px;
+  content: "";
+  background: #dbe4ee;
+}
+
+.diagram-builder-sequence-destruction::before {
+  transform: rotate(45deg);
+}
+
+.diagram-builder-sequence-destruction::after {
+  transform: rotate(-45deg);
+}
+
+.diagram-builder-sequence-participant-editor {
+  position: absolute;
+  z-index: 18;
+  top: calc(100% + 7px);
+  left: 50%;
+  display: grid;
+  gap: 7px;
+  width: 210px;
+  padding: 10px;
+  border: 1px solid #74518a;
+  border-radius: 6px;
+  color: #e7deec;
+  background: rgba(17, 13, 23, 0.98);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.58);
+  transform: translateX(-50%);
+}
+
+.diagram-builder-sequence-participant-name,
+.diagram-builder-sequence-length-input {
+  min-width: 0;
+  padding: 6px 7px;
+  border: 1px solid #51405f;
+  border-radius: 4px;
+  color: #fff;
+  background: #0b1119;
+  outline: none;
+  font: 600 9px/1.2 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.diagram-builder-sequence-participant-name:focus,
+.diagram-builder-sequence-length-input:focus {
+  border-color: #c77dff;
+  box-shadow: 0 0 0 2px rgba(199, 125, 255, 0.16);
+}
+
+.diagram-builder-sequence-editor-row {
+  display: grid;
+  grid-template-columns: 1fr 58px;
+  align-items: center;
+  gap: 8px;
+  font: 600 8px/1.2 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.diagram-builder-sequence-editor-row.checkbox {
+  grid-template-columns: auto 1fr;
+  justify-items: start;
+}
+
+.diagram-builder-sequence-editor-row.checkbox input {
+  accent-color: #c77dff;
 }
 
 .diagram-builder-piece.sequence-fragment,
