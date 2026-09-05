@@ -3038,9 +3038,14 @@ function diagramBuilderCanPlacePiece(session, piece, row, column, ignoredId = nu
     ));
 }
 
-function setDiagramBuilderStatus(session, message, state = "") {
-  session.status.textContent = message;
-  session.status.dataset.state = state;
+function diagramBuilderTaskText(viewType) {
+  const article = viewType === "pap" ? "einen" : "ein";
+  return `Übertrage den Code auf der linken Seite in ${article} ${UML_VIEWS[viewType]}`;
+}
+
+function setDiagramBuilderStatus(session) {
+  session.status.textContent = diagramBuilderTaskText(session.viewType);
+  delete session.status.dataset.state;
 }
 
 function clearDiagramBuilderConnectionMode(session) {
@@ -4127,7 +4132,8 @@ function renderDiagramBuilderPalette(session) {
   hideDiagramBuilderPaletteTooltip(session);
   session.paletteWrap.classList.remove("trash-active");
   session.palette.classList.remove("trash-mode");
-  session.paletteLabel.textContent = "Baustein halten, ins Raster ziehen und dort loslassen.";
+  session.paletteLabel.textContent = diagramBuilderTaskText(session.viewType);
+  delete session.paletteLabel.dataset.state;
   session.palette.replaceChildren();
   session.pieces.forEach((piece, index) => {
     const button = createElement("button", `diagram-builder-palette-item ${piece.kind}`);
@@ -6606,7 +6612,7 @@ function openDiagramBuilderMode(file) {
   const main = createElement("div", "diagram-builder-main");
   const left = createElement("section", "diagram-builder-left");
   const paletteWrap = createElement("div", "diagram-builder-palette-wrap");
-  const status = createElement("div", "diagram-builder-status", "Baustein halten, ins Raster ziehen und dort loslassen.");
+  const status = createElement("div", "diagram-builder-status", diagramBuilderTaskText("activity"));
   status.setAttribute("aria-live", "polite");
   paletteWrap.append(status);
   const palette = createElement("div", "diagram-builder-palette");
