@@ -1806,7 +1806,7 @@ body.folder-tree-resizing {
   stroke: #0a0810;
   stroke-width: 4px;
   paint-order: stroke fill;
-  fill: #dbe4ee;
+  fill: #ffd166;
   font: 700 9px/1 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
   cursor: text;
   pointer-events: auto;
@@ -1815,8 +1815,8 @@ body.folder-tree-resizing {
 
 .diagram-builder-connection-group:hover .diagram-builder-connector-label,
 .diagram-builder-connection-group:focus-within .diagram-builder-connector-label {
-  fill: #f0cfff;
-  filter: drop-shadow(0 0 4px rgba(199, 125, 255, 0.62));
+  fill: #ffe39a;
+  filter: drop-shadow(0 0 4px rgba(255, 209, 102, 0.68));
 }
 
 .diagram-builder-connection-label-editor {
