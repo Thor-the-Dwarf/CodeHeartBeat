@@ -2664,6 +2664,22 @@ const DIAGRAM_BUILDER_DEFAULT_CELL_WIDTH = 140;
 const DIAGRAM_BUILDER_DEFAULT_CELL_HEIGHT = 100;
 const DIAGRAM_BUILDER_CLASS_CELL_WIDTH = 210;
 const DIAGRAM_BUILDER_CLASS_CELL_HEIGHT = 130;
+const DIAGRAM_BUILDER_DECISION_RULE_COUNT = 4;
+
+function diagramBuilderDecisionTableRows(piece, key, fallbackValue) {
+  const rows = Array.isArray(piece?.[key]) ? piece[key] : [];
+  const normalized = rows.map((row) => ({
+    label: String(row?.label || ""),
+    values: Array.from(
+      { length: DIAGRAM_BUILDER_DECISION_RULE_COUNT },
+      (_, index) => String(row?.values?.[index] || fallbackValue)
+    )
+  }));
+  return normalized.length ? normalized : [{
+    label: "",
+    values: Array(DIAGRAM_BUILDER_DECISION_RULE_COUNT).fill(fallbackValue)
+  }];
+}
 
 function diagramBuilderPieceMetrics(piece) {
   const text = String(piece.label || "");
@@ -2706,6 +2722,22 @@ function diagramBuilderPieceMetrics(piece) {
       : headerHeight + sectionHeight(attributes) + sectionHeight(methods);
     return { elementWidth, elementHeight, labelWidth: elementWidth - 28, visualWidth: elementWidth, visualHeight: elementHeight };
   }
+  if (piece.kind === "pap-decision-table") {
+    const conditions = diagramBuilderDecisionTableRows(piece, "conditions", "J");
+    const actions = diagramBuilderDecisionTableRows(piece, "actions", "-");
+    const longestLabel = Math.max(
+      0,
+      text.length,
+      ...conditions.map((row) => row.label.length),
+      ...actions.map((row) => row.label.length)
+    );
+    const descriptionWidth = Math.min(280, Math.max(180, longestLabel * 6 + 72));
+    const elementWidth = 32 + descriptionWidth + DIAGRAM_BUILDER_DECISION_RULE_COUNT * 48;
+    const conditionHeight = Math.max(120, conditions.length * 34);
+    const actionHeight = Math.max(120, actions.length * 34);
+    const elementHeight = 59 + conditionHeight + actionHeight + 12;
+    return { elementWidth, elementHeight, labelWidth: descriptionWidth, visualWidth: elementWidth, visualHeight: elementHeight };
+  }
   const fixedMetrics = {
     "class-package": [170, 90],
     actor: [80, 90],
@@ -2714,8 +2746,7 @@ function diagramBuilderPieceMetrics(piece) {
     "sequence-actor": [80, 90],
     "sequence-object": [170, 58],
     "sequence-activation": [14, 72],
-    "sequence-fragment": [240, 120],
-    "pap-decision-table": [260, 150]
+    "sequence-fragment": [240, 120]
   }[piece.kind];
   if (fixedMetrics) {
     const [elementWidth, elementHeight] = fixedMetrics;
@@ -3017,6 +3048,10 @@ function beginDiagramBuilderLabelEdit(session, placement) {
     beginDiagramBuilderClassifierEdit(session, placement, node);
     return;
   }
+  if (placement.piece.kind === "pap-decision-table") {
+    beginDiagramBuilderDecisionTableEdit(session, placement, node);
+    return;
+  }
   const label = node?.querySelector(".diagram-builder-piece-label");
   if (!node || !label) return;
 
@@ -3044,6 +3079,212 @@ function beginDiagramBuilderLabelEdit(session, placement) {
   editor.addEventListener("blur", () => session.finishEditing?.(true));
   editor.focus();
   editor.select();
+}
+
+function createDiagramBuilderDecisionSelect(value, options, label) {
+  const select = createElement("select", "diagram-builder-decision-value-select");
+  select.setAttribute("aria-label", label);
+  options.forEach((optionValue) => {
+    const option = document.createElement("option");
+    option.value = optionValue;
+    option.textContent = optionValue;
+    option.selected = optionValue === value;
+    select.append(option);
+  });
+  return select;
+}
+
+function beginDiagramBuilderDecisionTableEdit(session, placement, node) {
+  if (!node) return;
+  const piece = placement.piece;
+  const original = {
+    label: piece.label || "",
+    conditions: diagramBuilderDecisionTableRows(piece, "conditions", "J").map((row) => ({ ...row, values: [...row.values] })),
+    actions: diagramBuilderDecisionTableRows(piece, "actions", "-").map((row) => ({ ...row, values: [...row.values] }))
+  };
+  const editor = createElement("div", "diagram-builder-decision-editor");
+  const table = createElement("table", "diagram-builder-decision-table editing-table");
+  const head = document.createElement("thead");
+  const titleRow = document.createElement("tr");
+  const titleCell = document.createElement("th");
+  titleCell.className = "diagram-builder-decision-title";
+  titleCell.colSpan = 2;
+  titleCell.rowSpan = 2;
+  const titleInput = createElement("input", "diagram-builder-decision-title-input");
+  titleInput.type = "text";
+  titleInput.value = original.label;
+  titleInput.placeholder = "Entscheidung";
+  titleInput.setAttribute("aria-label", "Titel der Entscheidungstabelle");
+  titleCell.append(titleInput);
+  const rulesTitle = document.createElement("th");
+  rulesTitle.className = "diagram-builder-decision-rules-title";
+  rulesTitle.colSpan = DIAGRAM_BUILDER_DECISION_RULE_COUNT;
+  rulesTitle.textContent = "Regeln";
+  titleRow.append(titleCell, rulesTitle);
+  const ruleRow = document.createElement("tr");
+  for (let ruleIndex = 0; ruleIndex < DIAGRAM_BUILDER_DECISION_RULE_COUNT; ruleIndex += 1) {
+    const rule = document.createElement("th");
+    rule.className = "diagram-builder-decision-rule-head";
+    rule.textContent = `R${ruleIndex + 1}`;
+    ruleRow.append(rule);
+  }
+  head.append(titleRow, ruleRow);
+  table.append(head);
+
+  const createGroup = (key, title, rowsData, options, fallbackValue) => {
+    const body = createElement("tbody", `diagram-builder-decision-group ${key}`);
+    const singular = title === "Bedingungen" ? "Bedingung" : "Aktion";
+    const addButton = createElement("button", "diagram-builder-decision-add", "+");
+    addButton.type = "button";
+    addButton.title = `${singular} hinzufügen`;
+    addButton.setAttribute("aria-label", addButton.title);
+    const updateBand = () => {
+      body.querySelector(".diagram-builder-decision-group-band")?.remove();
+      const firstRow = body.querySelector(".diagram-builder-decision-editor-row");
+      if (!firstRow) return;
+      const band = document.createElement("th");
+      band.className = "diagram-builder-decision-group-band";
+      band.rowSpan = body.querySelectorAll(".diagram-builder-decision-editor-row").length;
+      band.append(createElement("span", "diagram-builder-decision-group-label", title), addButton);
+      firstRow.prepend(band);
+    };
+    const appendRow = (rowData = { label: "", values: Array(DIAGRAM_BUILDER_DECISION_RULE_COUNT).fill(fallbackValue) }) => {
+      const row = createElement("tr", "diagram-builder-decision-editor-row");
+      const labelCell = document.createElement("th");
+      labelCell.className = "diagram-builder-decision-label-cell";
+      const labelEditor = createElement("div", "diagram-builder-decision-label-editor");
+      const dragHandle = createElement("button", "diagram-builder-decision-drag-handle");
+      dragHandle.type = "button";
+      dragHandle.title = "Halten und ziehen, um die Reihenfolge zu ändern";
+      dragHandle.setAttribute("aria-label", `${singular} verschieben`);
+      dragHandle.append(createElement("span", "diagram-builder-classifier-drag-icon", "⠿"));
+      const input = createElement("input", "diagram-builder-decision-label-input");
+      input.type = "text";
+      input.value = rowData.label;
+      input.placeholder = singular;
+      input.setAttribute("aria-label", `${singular} beschriften`);
+      const removeButton = createElement("button", "diagram-builder-decision-remove", "×");
+      removeButton.type = "button";
+      removeButton.title = `${singular} löschen`;
+      removeButton.setAttribute("aria-label", removeButton.title);
+      labelEditor.append(dragHandle, input, removeButton);
+      labelCell.append(labelEditor);
+      row.append(labelCell);
+      for (let ruleIndex = 0; ruleIndex < DIAGRAM_BUILDER_DECISION_RULE_COUNT; ruleIndex += 1) {
+        const valueCell = document.createElement("td");
+        valueCell.append(createDiagramBuilderDecisionSelect(
+          rowData.values[ruleIndex] || fallbackValue,
+          options,
+          `${singular}, Regel ${ruleIndex + 1}`
+        ));
+        row.append(valueCell);
+      }
+      body.append(row);
+
+      removeButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const rows = body.querySelectorAll(".diagram-builder-decision-editor-row");
+        if (rows.length === 1) {
+          input.value = "";
+          row.querySelectorAll("select").forEach((select) => { select.value = fallbackValue; });
+          input.focus({ preventScroll: true });
+          return;
+        }
+        row.remove();
+        updateBand();
+        body.querySelector("input")?.focus({ preventScroll: true });
+      });
+
+      dragHandle.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const pointerId = event.pointerId;
+        editor.dataset.reordering = "true";
+        row.classList.add("reordering");
+        const move = (moveEvent) => {
+          if (moveEvent.pointerId !== pointerId) return;
+          moveEvent.preventDefault();
+          const siblings = Array.from(body.querySelectorAll(".diagram-builder-decision-editor-row")).filter((candidate) => candidate !== row);
+          const nextRow = siblings.find((candidate) => {
+            const rect = candidate.getBoundingClientRect();
+            return moveEvent.clientY < rect.top + rect.height / 2;
+          });
+          if (nextRow) body.insertBefore(row, nextRow);
+          else body.append(row);
+          updateBand();
+        };
+        const finish = (finishEvent) => {
+          if (finishEvent.pointerId !== pointerId) return;
+          row.classList.remove("reordering");
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", finish);
+          window.removeEventListener("pointercancel", finish);
+          updateBand();
+          dragHandle.focus({ preventScroll: true });
+          window.setTimeout(() => { delete editor.dataset.reordering; }, 0);
+        };
+        window.addEventListener("pointermove", move, { passive: false });
+        window.addEventListener("pointerup", finish);
+        window.addEventListener("pointercancel", finish);
+      });
+      updateBand();
+      return input;
+    };
+    rowsData.forEach((rowData) => appendRow(rowData));
+    addButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      appendRow().focus({ preventScroll: true });
+    });
+    return {
+      body,
+      values: () => Array.from(body.querySelectorAll(".diagram-builder-decision-editor-row"), (row) => ({
+        label: row.querySelector(".diagram-builder-decision-label-input")?.value.trim() || "",
+        values: Array.from(row.querySelectorAll("select"), (select) => select.value)
+      }))
+    };
+  };
+
+  const conditions = createGroup("conditions", "Bedingungen", original.conditions, ["J", "N"], "J");
+  const separator = createElement("tbody", "diagram-builder-decision-separator");
+  const separatorRow = document.createElement("tr");
+  const separatorCell = document.createElement("td");
+  separatorCell.colSpan = DIAGRAM_BUILDER_DECISION_RULE_COUNT + 2;
+  separatorRow.append(separatorCell);
+  separator.append(separatorRow);
+  const actions = createGroup("actions", "Aktionen", original.actions, ["-", "X"], "-");
+  table.append(conditions.body, separator, actions.body);
+  editor.append(table);
+  node.replaceChildren(editor);
+  node.classList.add("editing", "decision-table-editing");
+  session.editingPlacementId = placement.id;
+  let finished = false;
+  session.finishEditing = (save) => {
+    if (finished) return;
+    finished = true;
+    if (save) {
+      piece.label = titleInput.value.trim();
+      piece.conditions = conditions.values();
+      piece.actions = actions.values();
+    } else Object.assign(piece, original);
+    session.editingPlacementId = null;
+    session.finishEditing = null;
+    renderDiagramBuilderWorkspace(session);
+    setDiagramBuilderStatus(session, save ? "Entscheidungstabelle übernommen." : "Bearbeitung abgebrochen.", save ? "success" : "");
+  };
+  editor.addEventListener("click", (event) => event.stopPropagation());
+  editor.addEventListener("dblclick", (event) => event.stopPropagation());
+  editor.addEventListener("contextmenu", (event) => event.stopPropagation());
+  editor.addEventListener("focusout", () => {
+    window.setTimeout(() => {
+      if (editor.dataset.reordering === "true") return;
+      if (!editor.contains(document.activeElement)) session.finishEditing?.(true);
+    }, 0);
+  });
+  titleInput.focus();
+  titleInput.select();
 }
 
 function createDiagramBuilderClassifierSectionEditor(title, values, inputLabel, sortable = false) {
@@ -3370,6 +3611,70 @@ function appendDiagramBuilderClassifierContent(node, piece, labelText) {
   node.append(content);
 }
 
+function appendDiagramBuilderDecisionTableContent(node, piece, labelText) {
+  if (node.classList.contains("diagram-builder-palette-item")) {
+    const preview = createElement("div", "diagram-builder-decision-preview");
+    preview.append(createElement("strong", "diagram-builder-decision-preview-title", labelText || "Entscheidungstabelle"));
+    for (let index = 0; index < 8; index += 1) preview.append(createElement("span", "diagram-builder-decision-preview-cell"));
+    node.append(preview);
+    return;
+  }
+  const conditions = diagramBuilderDecisionTableRows(piece, "conditions", "J");
+  const actions = diagramBuilderDecisionTableRows(piece, "actions", "-");
+  const table = createElement("table", "diagram-builder-decision-table");
+  const head = document.createElement("thead");
+  const titleRow = document.createElement("tr");
+  const title = document.createElement("th");
+  title.className = "diagram-builder-decision-title";
+  title.colSpan = 2;
+  title.rowSpan = 2;
+  title.textContent = labelText || "Entscheidungstabelle";
+  const rulesTitle = document.createElement("th");
+  rulesTitle.className = "diagram-builder-decision-rules-title";
+  rulesTitle.colSpan = DIAGRAM_BUILDER_DECISION_RULE_COUNT;
+  rulesTitle.textContent = "Regeln";
+  titleRow.append(title, rulesTitle);
+  const ruleRow = document.createElement("tr");
+  for (let ruleIndex = 0; ruleIndex < DIAGRAM_BUILDER_DECISION_RULE_COUNT; ruleIndex += 1) {
+    const rule = document.createElement("th");
+    rule.className = "diagram-builder-decision-rule-head";
+    rule.textContent = `R${ruleIndex + 1}`;
+    ruleRow.append(rule);
+  }
+  head.append(titleRow, ruleRow);
+  table.append(head);
+  const appendGroup = (titleText, rows) => {
+    const body = createElement("tbody", "diagram-builder-decision-group");
+    rows.forEach((rowData, rowIndex) => {
+      const row = document.createElement("tr");
+      if (rowIndex === 0) {
+        const band = document.createElement("th");
+        band.className = "diagram-builder-decision-group-band";
+        band.rowSpan = rows.length;
+        band.append(createElement("span", "diagram-builder-decision-group-label", titleText));
+        row.append(band);
+      }
+      const label = document.createElement("th");
+      label.className = "diagram-builder-decision-row-label";
+      label.textContent = rowData.label;
+      row.append(label);
+      rowData.values.forEach((value) => row.append(createElement("td", "diagram-builder-decision-value", value)));
+      body.append(row);
+    });
+    table.append(body);
+  };
+  appendGroup("Bedingungen", conditions);
+  const separator = createElement("tbody", "diagram-builder-decision-separator");
+  const separatorRow = document.createElement("tr");
+  const separatorCell = document.createElement("td");
+  separatorCell.colSpan = DIAGRAM_BUILDER_DECISION_RULE_COUNT + 2;
+  separatorRow.append(separatorCell);
+  separator.append(separatorRow);
+  table.append(separator);
+  appendGroup("Aktionen", actions);
+  node.append(table);
+}
+
 function appendDiagramBuilderPieceContent(node, piece, labelText) {
   if (["actor", "sequence-actor"].includes(piece.kind)) {
     appendDiagramBuilderActorContent(node, labelText);
@@ -3383,6 +3688,10 @@ function appendDiagramBuilderPieceContent(node, piece, labelText) {
     appendDiagramBuilderClassifierContent(node, piece, labelText);
     return;
   }
+  if (piece.kind === "pap-decision-table") {
+    appendDiagramBuilderDecisionTableContent(node, piece, labelText);
+    return;
+  }
   node.append(createElement("span", "diagram-builder-piece-label", labelText || ""));
 }
 
@@ -3394,7 +3703,7 @@ function renderDiagramBuilderPalette(session) {
   session.pieces.forEach((piece, index) => {
     const button = createElement("button", `diagram-builder-palette-item ${piece.kind}`);
     button.type = "button";
-    if (!["activity-swimlane", "actor", "sequence-actor", "sequence-activation"].includes(piece.kind)) {
+    if (!["activity-swimlane", "actor", "sequence-actor", "sequence-activation", "pap-decision-table"].includes(piece.kind)) {
       applyDiagramBuilderPieceMetrics(button, { ...piece, label: piece.paletteLabel });
     }
     appendDiagramBuilderPieceContent(button, piece, piece.paletteLabel);
@@ -4575,6 +4884,10 @@ function addDiagramBuilderPlacement(session, piece, row, column) {
     return false;
   }
   const placedPiece = { ...piece };
+  if (placedPiece.kind === "pap-decision-table") {
+    placedPiece.conditions = diagramBuilderDecisionTableRows(placedPiece, "conditions", "J");
+    placedPiece.actions = diagramBuilderDecisionTableRows(placedPiece, "actions", "-");
+  }
   if (diagramBuilderIsSequenceParticipant(placedPiece)) {
     placedPiece.lifelineRows = Math.max(1, Number(placedPiece.lifelineRows) || 5);
     placedPiece.lifelineEndX = Boolean(placedPiece.lifelineEndX);

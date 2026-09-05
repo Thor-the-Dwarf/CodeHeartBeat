@@ -2722,15 +2722,229 @@ body.folder-tree-resizing {
 
 .diagram-builder-piece.pap-decision-table,
 .diagram-builder-palette-item.pap-decision-table {
+  padding: 0;
   border-radius: 0;
   border-color: #4d83c4;
-  color: #f6d768;
-  background:
-    linear-gradient(#718096, #718096) 0 34% / 100% 1px no-repeat,
-    linear-gradient(#718096, #718096) 0 56% / 100% 1px no-repeat,
-    linear-gradient(#718096, #718096) 0 78% / 100% 1px no-repeat,
-    linear-gradient(90deg, transparent 0 46%, #718096 46% calc(46% + 1px), transparent calc(46% + 1px) 64%, #718096 64% calc(64% + 1px), transparent calc(64% + 1px) 82%, #718096 82% calc(82% + 1px), transparent calc(82% + 1px)),
-    #17283f;
+  color: #eaf1fb;
+  background: #111925;
+}
+
+.diagram-builder-palette-item.pap-decision-table {
+  width: 210px;
+  min-width: 210px;
+  min-height: 92px;
+}
+
+.diagram-builder-decision-preview {
+  display: grid;
+  grid-template-columns: 1.5fr repeat(3, 1fr);
+  width: 100%;
+  height: 100%;
+}
+
+.diagram-builder-decision-preview-title {
+  grid-column: 1 / -1;
+  display: grid;
+  min-height: 30px;
+  border-bottom: 1px solid #4d83c4;
+  color: #fff0a7;
+  background: #5b510d;
+  place-items: center;
+}
+
+.diagram-builder-decision-preview-cell {
+  min-height: 22px;
+  border-right: 1px solid #697588;
+  border-bottom: 1px solid #697588;
+  background: #162335;
+}
+
+.diagram-builder-decision-preview-cell:nth-last-child(-n + 4) {
+  border-bottom: 0;
+}
+
+.diagram-builder-decision-preview-cell:nth-child(5),
+.diagram-builder-decision-preview-cell:nth-child(9) {
+  border-right: 0;
+}
+
+.diagram-builder-decision-editor,
+.diagram-builder-decision-table {
+  width: 100%;
+  min-width: 0;
+}
+
+.diagram-builder-decision-table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  color: #eaf1fb;
+  background: #111925;
+  font: 700 8px/1.2 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.diagram-builder-decision-table th,
+.diagram-builder-decision-table td {
+  height: 34px;
+  padding: 4px 6px;
+  border: 1px solid #697588;
+  text-align: center;
+}
+
+.diagram-builder-decision-title {
+  width: 212px;
+  color: #fff0a7;
+  background: #5b510d;
+  font-size: 10px;
+  text-align: left !important;
+}
+
+.diagram-builder-decision-rules-title {
+  height: 30px !important;
+  color: #dbeaff;
+  background: #173b69;
+  text-align: left !important;
+}
+
+.diagram-builder-decision-rule-head,
+.diagram-builder-decision-row-label {
+  background: #214e7f;
+}
+
+.diagram-builder-decision-rule-head {
+  width: 48px;
+  height: 29px !important;
+  color: #dbeaff;
+  font-weight: 600;
+}
+
+.diagram-builder-decision-group-band {
+  width: 32px;
+  padding: 4px 2px !important;
+  color: #fff0a7;
+  background: #5b510d;
+}
+
+.diagram-builder-decision-group-label {
+  display: inline-block;
+  letter-spacing: 0.02em;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.diagram-builder-decision-row-label,
+.diagram-builder-decision-label-cell {
+  overflow: hidden;
+  color: #e4efff;
+  background: #214e7f;
+  font-weight: 600;
+  text-align: left !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagram-builder-decision-value {
+  color: #eef4ff;
+  background: #131c29;
+  font-size: 10px;
+}
+
+.diagram-builder-decision-separator td {
+  height: 12px;
+  padding: 0;
+  background: #3a424e;
+}
+
+.diagram-builder-decision-title-input,
+.diagram-builder-decision-label-input,
+.diagram-builder-decision-value-select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #526a82;
+  border-radius: 3px;
+  color: #f5f8fd;
+  background: #0b1119;
+  outline: none;
+  font: 700 8px/1.2 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.diagram-builder-decision-title-input,
+.diagram-builder-decision-label-input {
+  padding: 5px 6px;
+}
+
+.diagram-builder-decision-title-input {
+  color: #fff0a7;
+}
+
+.diagram-builder-decision-value-select {
+  height: 24px;
+  padding: 2px 4px;
+  color-scheme: dark;
+  text-align: center;
+  cursor: pointer;
+}
+
+.diagram-builder-decision-label-editor {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 5px;
+}
+
+.diagram-builder-decision-add,
+.diagram-builder-decision-drag-handle,
+.diagram-builder-decision-remove {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid #526a82;
+  border-radius: 3px;
+  color: #dce8f5;
+  background: #142131;
+  cursor: pointer;
+  place-items: center;
+  font: 800 13px/1 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.diagram-builder-decision-add {
+  margin: 7px auto 0;
+}
+
+.diagram-builder-decision-drag-handle {
+  border-color: transparent;
+  color: #91a5ba;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+}
+
+.diagram-builder-decision-drag-handle:active {
+  cursor: grabbing;
+}
+
+.diagram-builder-decision-remove {
+  border-color: #754458;
+  color: #ff9bb0;
+  background: #27131b;
+}
+
+.diagram-builder-decision-editor-row.reordering {
+  opacity: 0.72;
+  filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.42));
+}
+
+.diagram-builder-decision-title-input:focus,
+.diagram-builder-decision-label-input:focus,
+.diagram-builder-decision-value-select:focus,
+.diagram-builder-decision-add:hover,
+.diagram-builder-decision-add:focus-visible,
+.diagram-builder-decision-drag-handle:hover,
+.diagram-builder-decision-drag-handle:focus-visible,
+.diagram-builder-decision-remove:hover,
+.diagram-builder-decision-remove:focus-visible {
+  border-color: #c77dff;
+  box-shadow: 0 0 0 2px rgba(199, 125, 255, 0.16);
 }
 
 .diagram-builder-connectors {
