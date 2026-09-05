@@ -3071,6 +3071,7 @@ function beginDiagramBuilderPaletteDrag(session, pieceIndex, button, event) {
 
 function beginDiagramBuilderLabelEdit(session, placement) {
   session.finishEditing?.(true);
+  session.finishSystemBoundaryEditing?.(true);
   clearDiagramBuilderConnectionMode(session);
   const node = session.surface.querySelector(`[data-placement-id="${placement.id}"] .diagram-builder-piece`);
   if (diagramBuilderIsSequenceParticipant(placement.piece)) {
@@ -4186,6 +4187,7 @@ function diagramBuilderTargetPortAssignments(session, sourceSides) {
 
 function beginDiagramBuilderConnectionLabelEdit(session, connection, clientX, clientY) {
   session.finishConnectionEditing?.(true);
+  session.finishSystemBoundaryEditing?.(true);
   const original = {
     label: connection.label || "",
     startMarker: connection.startMarker || "none",
@@ -4905,14 +4907,97 @@ function createDiagramBuilderSystemBoundaryHandle(session, boundary, node, class
   return handle;
 }
 
+function beginDiagramBuilderSystemBoundaryEdit(session, boundary) {
+  session.finishEditing?.(true);
+  session.finishConnectionEditing?.(true);
+  session.finishSwimlaneEditing?.(true);
+  session.finishSystemBoundaryEditing?.(true);
+  clearDiagramBuilderPlacementMode(session);
+  clearDiagramBuilderConnectionMode(session);
+  const original = {
+    label: boundary.label || "",
+    leftColumn: boundary.leftColumn,
+    rightColumn: boundary.rightColumn,
+    topRow: boundary.topRow,
+    bottomRow: boundary.bottomRow
+  };
+  session.editingSystemBoundaryId = boundary.id;
+  session.selectedPlacementId = null;
+  session.selectedSwimlaneId = null;
+  session.selectedSystemBoundaryId = boundary.id;
+  let finished = false;
+  session.finishSystemBoundaryEditing = (save) => {
+    if (finished) return;
+    finished = true;
+    const editor = session.surface.querySelector(
+      `[data-system-boundary-id="${boundary.id}"] .diagram-builder-system-boundary-label-editor`
+    );
+    if (save) boundary.label = editor?.value.trim() || "";
+    else Object.assign(boundary, original);
+    session.editingSystemBoundaryId = null;
+    session.finishSystemBoundaryEditing = null;
+    renderDiagramBuilderWorkspace(session);
+    setDiagramBuilderStatus(
+      session,
+      save ? "Systemgrenze übernommen." : "Bearbeitung der Systemgrenze abgebrochen.",
+      save ? "success" : ""
+    );
+  };
+  renderDiagramBuilderWorkspace(session);
+  const editor = session.surface.querySelector(
+    `[data-system-boundary-id="${boundary.id}"] .diagram-builder-system-boundary-label-editor`
+  );
+  editor?.focus({ preventScroll: true });
+  editor?.select();
+}
+
 function createDiagramBuilderSystemBoundaryNode(session, boundary) {
+  const isEditing = session.editingSystemBoundaryId === boundary.id;
   const node = createElement(
     "section",
-    `diagram-builder-system-boundary${session.selectedSystemBoundaryId === boundary.id ? " selected" : ""}`
+    `diagram-builder-system-boundary${isEditing ? " editing" : ""}${session.selectedSystemBoundaryId === boundary.id ? " selected" : ""}`
   );
   node.dataset.systemBoundaryId = String(boundary.id);
-  node.setAttribute("aria-label", "Systemgrenze; Kanten oder Ecken ziehen, um die Größe zu verändern");
+  node.setAttribute(
+    "aria-label",
+    `${boundary.label ? `Systemgrenze ${boundary.label}` : "Unbenannte Systemgrenze"}; doppelklicken zum Bearbeiten`
+  );
+  node.title = "Doppelklick auf die Bezeichnung zum Bearbeiten";
   applyDiagramBuilderSystemBoundaryGeometry(session, boundary, node);
+  if (isEditing) {
+    const editor = createElement("input", "diagram-builder-system-boundary-label-editor");
+    editor.type = "text";
+    editor.value = boundary.label || "";
+    editor.placeholder = "Systembezeichnung";
+    editor.setAttribute("aria-label", "Bezeichnung der Systemgrenze bearbeiten");
+    editor.addEventListener("click", (event) => event.stopPropagation());
+    editor.addEventListener("dblclick", (event) => event.stopPropagation());
+    editor.addEventListener("blur", () => {
+      window.setTimeout(() => {
+        if (document.activeElement?.closest?.(".diagram-builder-system-boundary-handle")) return;
+        session.finishSystemBoundaryEditing?.(true);
+      }, 0);
+    });
+    node.append(editor);
+  } else {
+    const label = createElement(
+      "button",
+      `diagram-builder-system-boundary-label${boundary.label ? "" : " is-empty"}`,
+      boundary.label || ""
+    );
+    label.type = "button";
+    label.title = "Doppelklick zum Benennen";
+    label.setAttribute(
+      "aria-label",
+      `${boundary.label || "Unbenannte Systemgrenze"}; doppelklicken zum Bearbeiten`
+    );
+    label.addEventListener("dblclick", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      beginDiagramBuilderSystemBoundaryEdit(session, boundary);
+    });
+    node.append(label);
+  }
   node.append(
     createDiagramBuilderSystemBoundaryHandle(session, boundary, node, "edge top", null, "top"),
     createDiagramBuilderSystemBoundaryHandle(session, boundary, node, "edge right", "right", null),
@@ -4932,12 +5017,19 @@ function createDiagramBuilderSystemBoundaryNode(session, boundary) {
       .forEach((item) => item.classList.remove("selected"));
     node.classList.add("selected");
   });
+  node.addEventListener("dblclick", (event) => {
+    if (isEditing || event.target.closest(".diagram-builder-system-boundary-handle")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    beginDiagramBuilderSystemBoundaryEdit(session, boundary);
+  });
   return node;
 }
 
 function addDiagramBuilderSystemBoundary(session, row, column) {
   const boundary = {
     id: ++session.nextSystemBoundaryId,
+    label: "",
     leftColumn: Math.max(0, column),
     rightColumn: Math.max(0, column) + 3,
     topRow: Math.max(0, row),
@@ -4948,7 +5040,7 @@ function addDiagramBuilderSystemBoundary(session, row, column) {
   session.selectedSwimlaneId = null;
   session.selectedSystemBoundaryId = boundary.id;
   renderDiagramBuilderWorkspace(session);
-  setDiagramBuilderStatus(session, "Systemgrenze platziert. Kanten oder Ecken ziehen, um sie auf den Gridlinien anzupassen.", "success");
+  setDiagramBuilderStatus(session, "Systemgrenze platziert. Bezeichnung doppelklicken oder Kanten und Ecken ziehen.", "success");
   return true;
 }
 
@@ -4961,6 +5053,7 @@ function beginDiagramBuilderSwimlaneEdit(session, swimlane) {
   session.finishEditing?.(true);
   session.finishConnectionEditing?.(true);
   session.finishSwimlaneEditing?.(true);
+  session.finishSystemBoundaryEditing?.(true);
   clearDiagramBuilderPlacementMode(session);
   clearDiagramBuilderConnectionMode(session);
   const original = {
@@ -5183,6 +5276,7 @@ function switchDiagramBuilderView(session, nextViewType) {
   session.finishEditing?.(true);
   session.finishConnectionEditing?.(true);
   session.finishSwimlaneEditing?.(true);
+  session.finishSystemBoundaryEditing?.(true);
   clearDiagramBuilderPlacementMode(session);
   clearDiagramBuilderConnectionMode(session);
   session.diagramStates.set(session.viewType, {
@@ -5261,6 +5355,7 @@ function createDiagramBuilderCodePane(file) {
 
 function closeDiagramBuilderMode() {
   if (!activeDiagramBuilderSession) return;
+  activeDiagramBuilderSession.finishSystemBoundaryEditing?.(true);
   document.removeEventListener("keydown", activeDiagramBuilderSession.handleKeyDown, true);
   activeDiagramBuilderSession.resizeObserver?.disconnect();
   activeDiagramBuilderSession.overlay.remove();
@@ -5375,6 +5470,8 @@ function openDiagramBuilderMode(file) {
     finishConnectionEditing: null,
     editingSwimlaneId: null,
     finishSwimlaneEditing: null,
+    editingSystemBoundaryId: null,
+    finishSystemBoundaryEditing: null,
     toast,
     toastMessage,
     toastCancelButton,
@@ -5501,6 +5598,13 @@ function openDiagramBuilderMode(file) {
       event.preventDefault();
       event.stopImmediatePropagation();
       session.finishSwimlaneEditing?.(event.key === "Enter");
+      return;
+    }
+    if (session.editingSystemBoundaryId) {
+      if (event.key !== "Enter" && event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      session.finishSystemBoundaryEditing?.(event.key === "Enter");
       return;
     }
     if (event.key === "Escape") {

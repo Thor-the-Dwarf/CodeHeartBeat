@@ -1446,12 +1446,59 @@ body.folder-tree-resizing {
 }
 
 .diagram-builder-system-boundary.selected,
+.diagram-builder-system-boundary.editing,
 .diagram-builder-system-boundary:has(.diagram-builder-system-boundary-handle:hover),
 .diagram-builder-system-boundary.resizing {
   z-index: 3;
   border-color: #c77dff;
   background: rgba(94, 53, 116, 0.06);
   box-shadow: inset 0 0 0 1px rgba(199, 125, 255, 0.12);
+}
+
+.diagram-builder-system-boundary-label,
+.diagram-builder-system-boundary-label-editor {
+  position: absolute;
+  z-index: 4;
+  top: 8px;
+  left: 10px;
+  box-sizing: border-box;
+  max-width: calc(100% - 20px);
+  min-height: 28px;
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #e9eef8;
+  background: rgba(9, 13, 21, 0.82);
+  font: 700 13px/1.3 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  text-align: left;
+  pointer-events: auto;
+}
+
+.diagram-builder-system-boundary-label {
+  overflow: hidden;
+  padding: 5px 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+}
+
+.diagram-builder-system-boundary-label.is-empty {
+  width: 104px;
+  background: transparent;
+}
+
+.diagram-builder-system-boundary-label.is-empty:hover,
+.diagram-builder-system-boundary-label.is-empty:focus-visible {
+  border-color: rgba(199, 125, 255, 0.55);
+  background: rgba(62, 43, 73, 0.2);
+}
+
+.diagram-builder-system-boundary-label-editor {
+  width: min(280px, calc(100% - 20px));
+  padding: 5px 8px;
+  border-color: #c77dff;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(199, 125, 255, 0.18);
 }
 
 .diagram-builder-system-boundary-handle {
