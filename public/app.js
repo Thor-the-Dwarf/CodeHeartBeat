@@ -2599,12 +2599,13 @@ function diagramBuilderPiece(kind, paletteLabel) {
   return { kind, label: "", paletteLabel, lineIndex: null };
 }
 
-function createDiagramBuilderPieces() {
+function createDiagramBuilderPieces(file) {
   return [
     diagramBuilderPiece("activity-start", "Start"),
     diagramBuilderPiece("activity-action", "Aktion"),
     diagramBuilderPiece("activity-decision", "Entscheidung"),
-    diagramBuilderPiece("activity-end", "Ende")
+    diagramBuilderPiece("activity-end", "Ende"),
+    { ...diagramBuilderPiece("activity-swimlane", "Swimlane"), defaultLabel: file?.name?.replace(/\.java$/i, "") || "Klasse" }
   ];
 }
 
@@ -2657,7 +2658,11 @@ function updateDiagramBuilderGridMetrics(session) {
   const largestHeight = metrics.length ? Math.max(...metrics.map((item) => item.visualHeight)) : 0;
   session.cellWidth = Math.max(DIAGRAM_BUILDER_DEFAULT_CELL_WIDTH, Math.ceil((largestWidth + 28) / 10) * 10);
   session.cellHeight = Math.max(DIAGRAM_BUILDER_DEFAULT_CELL_HEIGHT, Math.ceil((largestHeight + 28) / 10) * 10);
-  const maximumColumn = Math.max(0, ...session.placements.map((placement) => placement.column));
+  const maximumColumn = Math.max(
+    0,
+    ...session.placements.map((placement) => placement.column),
+    ...session.swimlanes.map((swimlane) => swimlane.rightColumn - 1)
+  );
   const maximumRow = Math.max(0, ...session.placements.map((placement) => placement.row));
   session.surface.style.setProperty("--builder-cell-width", `${session.cellWidth}px`);
   session.surface.style.setProperty("--builder-cell-height", `${session.cellHeight}px`);
@@ -3644,7 +3649,135 @@ function createDiagramBuilderPlacedNode(session, placement) {
   return cell;
 }
 
+function applyDiagramBuilderSwimlaneGeometry(session, swimlane, node) {
+  node.style.left = `${swimlane.leftColumn * session.cellWidth}px`;
+  node.style.width = `${(swimlane.rightColumn - swimlane.leftColumn) * session.cellWidth}px`;
+}
+
+function beginDiagramBuilderSwimlaneEdit(session, swimlane) {
+  session.finishEditing?.(true);
+  session.finishConnectionEditing?.(true);
+  session.finishSwimlaneEditing?.(true);
+  clearDiagramBuilderPlacementMode(session);
+  clearDiagramBuilderConnectionMode(session);
+  const original = {
+    label: swimlane.label,
+    leftColumn: swimlane.leftColumn,
+    rightColumn: swimlane.rightColumn
+  };
+  session.editingSwimlaneId = swimlane.id;
+  session.selectedSwimlaneId = swimlane.id;
+  let finished = false;
+  session.finishSwimlaneEditing = (save) => {
+    if (finished) return;
+    finished = true;
+    const editor = session.surface.querySelector(`[data-swimlane-id="${swimlane.id}"] .diagram-builder-swimlane-label-editor`);
+    if (save) swimlane.label = editor?.value.trim() || swimlane.label;
+    else Object.assign(swimlane, original);
+    session.editingSwimlaneId = null;
+    session.finishSwimlaneEditing = null;
+    renderDiagramBuilderWorkspace(session);
+    setDiagramBuilderStatus(session, save ? "Swimlane übernommen." : "Swimlane-Bearbeitung abgebrochen.", save ? "success" : "");
+  };
+  renderDiagramBuilderWorkspace(session);
+  const editor = session.surface.querySelector(`[data-swimlane-id="${swimlane.id}"] .diagram-builder-swimlane-label-editor`);
+  editor?.focus({ preventScroll: true });
+  editor?.select();
+}
+
+function createDiagramBuilderSwimlaneBoundary(session, swimlane, side, laneNode) {
+  const boundary = createElement("button", `diagram-builder-swimlane-boundary ${side}`);
+  boundary.type = "button";
+  boundary.setAttribute("aria-label", `${side === "left" ? "Linke" : "Rechte"} Swimlane-Grenze verschieben`);
+  boundary.title = "Horizontal verschieben · rastet auf Gridlinien ein";
+  let pointerId = null;
+  const move = (event) => {
+    if (event.pointerId !== pointerId) return;
+    event.preventDefault();
+    const surfaceRect = session.surface.getBoundingClientRect();
+    const maximumColumn = Math.max(1, Math.round(session.surface.clientWidth / session.cellWidth));
+    const requestedColumn = Math.round((event.clientX - surfaceRect.left) / session.cellWidth);
+    if (side === "left") swimlane.leftColumn = Math.max(0, Math.min(swimlane.rightColumn - 1, requestedColumn));
+    else swimlane.rightColumn = Math.min(maximumColumn, Math.max(swimlane.leftColumn + 1, requestedColumn));
+    applyDiagramBuilderSwimlaneGeometry(session, swimlane, laneNode);
+    setDiagramBuilderStatus(session, "Swimlane-Grenze ist auf einer Gridlinie eingerastet.", "success");
+  };
+  const finish = (event) => {
+    if (event.pointerId !== pointerId) return;
+    pointerId = null;
+    boundary.classList.remove("dragging");
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", finish);
+    window.removeEventListener("pointercancel", finish);
+    laneNode.querySelector(".diagram-builder-swimlane-label-editor")?.focus({ preventScroll: true });
+  };
+  boundary.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    pointerId = event.pointerId;
+    boundary.classList.add("dragging");
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
+  });
+  return boundary;
+}
+
+function createDiagramBuilderSwimlaneNode(session, swimlane) {
+  const lane = createElement("section", `diagram-builder-swimlane${session.editingSwimlaneId === swimlane.id ? " editing" : ""}`);
+  lane.dataset.swimlaneId = String(swimlane.id);
+  applyDiagramBuilderSwimlaneGeometry(session, swimlane, lane);
+  if (session.editingSwimlaneId === swimlane.id) {
+    const editor = createElement("input", "diagram-builder-swimlane-label-editor");
+    editor.type = "text";
+    editor.value = swimlane.label;
+    editor.setAttribute("aria-label", "Bezeichnung der Swimlane bearbeiten");
+    editor.addEventListener("blur", () => {
+      window.setTimeout(() => {
+        if (document.activeElement?.closest?.(".diagram-builder-swimlane-boundary")) return;
+        session.finishSwimlaneEditing?.(true);
+      }, 0);
+    });
+    lane.append(editor);
+    lane.append(
+      createDiagramBuilderSwimlaneBoundary(session, swimlane, "left", lane),
+      createDiagramBuilderSwimlaneBoundary(session, swimlane, "right", lane)
+    );
+  } else {
+    const label = createElement("button", "diagram-builder-swimlane-label", swimlane.label);
+    label.type = "button";
+    label.title = "Doppelklick zum Bearbeiten";
+    label.setAttribute("aria-label", `${swimlane.label}; Swimlane doppelklicken zum Bearbeiten`);
+    label.addEventListener("click", () => { session.selectedSwimlaneId = swimlane.id; });
+    label.addEventListener("dblclick", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      beginDiagramBuilderSwimlaneEdit(session, swimlane);
+    });
+    lane.append(label);
+  }
+  return lane;
+}
+
+function addDiagramBuilderSwimlane(session, piece, column) {
+  const columns = Math.max(1, Math.floor(session.surface.clientWidth / session.cellWidth));
+  const leftColumn = Math.min(columns - 1, Math.max(0, column));
+  const swimlane = {
+    id: ++session.nextSwimlaneId,
+    label: piece.defaultLabel || "Klasse",
+    leftColumn,
+    rightColumn: Math.min(columns, leftColumn + 1)
+  };
+  session.swimlanes.push(swimlane);
+  session.selectedSwimlaneId = swimlane.id;
+  renderDiagramBuilderWorkspace(session);
+  setDiagramBuilderStatus(session, "Swimlane platziert. Doppelklick auf den Klassennamen öffnet den Bearbeitungsmodus.", "success");
+  return true;
+}
+
 function addDiagramBuilderPlacement(session, piece, row, column) {
+  if (piece.kind === "activity-swimlane") return addDiagramBuilderSwimlane(session, piece, column);
   if (diagramBuilderPlacementAt(session, row, column)) {
     setDiagramBuilderStatus(session, "Dieses Rasterfeld ist bereits belegt.", "error");
     return false;
@@ -3673,9 +3806,10 @@ function renderDiagramBuilderWorkspace(session) {
   updateDiagramBuilderGridMetrics(session);
   session.connectorLayer = createSvgElement("svg", { class: "diagram-builder-connectors", "aria-hidden": "true" });
   session.surface.replaceChildren(session.connectorLayer, session.emptyHint);
-  session.emptyHint.hidden = session.placements.length > 0;
+  session.emptyHint.hidden = session.placements.length > 0 || session.swimlanes.length > 0;
 
   renderDiagramBuilderPalette(session);
+  session.swimlanes.forEach((swimlane) => session.surface.append(createDiagramBuilderSwimlaneNode(session, swimlane)));
   session.placements.forEach((placement) => {
     const cell = createDiagramBuilderPlacedNode(session, placement);
     session.surface.append(cell);
@@ -3784,12 +3918,15 @@ function openDiagramBuilderMode(file) {
     viewType: "activity",
     pieces: [],
     placements: [],
+    swimlanes: [],
     connections: [],
     nextPlacementId: 0,
+    nextSwimlaneId: 0,
     nextConnectionId: 0,
     cellWidth: DIAGRAM_BUILDER_DEFAULT_CELL_WIDTH,
     cellHeight: DIAGRAM_BUILDER_DEFAULT_CELL_HEIGHT,
     selectedPlacementId: null,
+    selectedSwimlaneId: null,
     armedPieceIndex: null,
     previewCell: null,
     contextPlacementId: null,
@@ -3801,6 +3938,8 @@ function openDiagramBuilderMode(file) {
     finishEditing: null,
     editingConnectionId: null,
     finishConnectionEditing: null,
+    editingSwimlaneId: null,
+    finishSwimlaneEditing: null,
     toast,
     toastMessage,
     toastCancelButton,
@@ -3911,6 +4050,13 @@ function openDiagramBuilderMode(file) {
       event.preventDefault();
       event.stopImmediatePropagation();
       session.finishConnectionEditing?.(event.key === "Enter");
+      return;
+    }
+    if (session.editingSwimlaneId) {
+      if (event.key !== "Enter" && event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      session.finishSwimlaneEditing?.(event.key === "Enter");
       return;
     }
     if (event.key === "Escape") {
