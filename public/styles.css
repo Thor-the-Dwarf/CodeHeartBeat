@@ -3752,7 +3752,62 @@ body.folder-tree-resizing {
   outline: none;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55), 0 0 0 2px rgba(199, 125, 255, 0.18);
   font: 600 10px/1.3 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
-  transform: translate(-50%, -50%);
+}
+
+.diagram-builder-connection-label-editor,
+.diagram-builder-usecase-relation-editor,
+.diagram-builder-arrowhead-menu {
+  border-radius: 10px;
+  isolation: isolate;
+}
+
+.diagram-builder-connection-label-editor::before,
+.diagram-builder-usecase-relation-editor::before,
+.diagram-builder-arrowhead-menu::before {
+  position: absolute;
+  z-index: -1;
+  width: 14px;
+  height: 14px;
+  border: solid #c77dff;
+  background: inherit;
+  content: "";
+  transform: rotate(45deg);
+}
+
+.diagram-builder-connection-label-editor.bubble-above::before,
+.diagram-builder-usecase-relation-editor.bubble-above::before,
+.diagram-builder-arrowhead-menu.bubble-above::before {
+  bottom: -8px;
+  left: var(--bubble-tail-x, 50%);
+  border-width: 0 1px 1px 0;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.diagram-builder-connection-label-editor.bubble-below::before,
+.diagram-builder-usecase-relation-editor.bubble-below::before,
+.diagram-builder-arrowhead-menu.bubble-below::before {
+  top: -8px;
+  left: var(--bubble-tail-x, 50%);
+  border-width: 1px 0 0 1px;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.diagram-builder-connection-label-editor.bubble-left::before,
+.diagram-builder-usecase-relation-editor.bubble-left::before,
+.diagram-builder-arrowhead-menu.bubble-left::before {
+  top: var(--bubble-tail-y, 50%);
+  right: -8px;
+  border-width: 1px 1px 0 0;
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.diagram-builder-connection-label-editor.bubble-right::before,
+.diagram-builder-usecase-relation-editor.bubble-right::before,
+.diagram-builder-arrowhead-menu.bubble-right::before {
+  top: var(--bubble-tail-y, 50%);
+  left: -8px;
+  border-width: 0 0 1px 1px;
+  transform: translateY(-50%) rotate(45deg);
 }
 
 .diagram-builder-connection-type-select,
@@ -3786,7 +3841,6 @@ body.folder-tree-resizing {
   border-radius: 7px;
   background: rgba(22, 16, 29, 0.99);
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.56), 0 0 0 2px rgba(199, 125, 255, 0.12);
-  transform: translate(-50%, 12px);
 }
 
 .diagram-builder-usecase-relation-select,
@@ -3864,6 +3918,10 @@ body.folder-tree-resizing {
   background: rgba(22, 16, 29, 0.99);
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.56);
   transform: translate(-50%, 12px);
+}
+
+.diagram-builder-endpoint-menu.diagram-builder-arrowhead-menu {
+  transform: none;
 }
 
 .diagram-builder-endpoint-menu button {

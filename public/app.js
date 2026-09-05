@@ -4825,7 +4825,66 @@ function diagramBuilderIsUseCaseDependency(session, connection) {
   return source?.piece.kind === "usecase" && target?.piece.kind === "usecase";
 }
 
-function beginDiagramBuilderUseCaseDependencyEdit(session, connection, clientX, clientY) {
+function diagramBuilderRouteCenter(route) {
+  const segments = route?.segments || [];
+  const totalLength = segments.reduce((sum, segment) => (
+    sum + Math.abs(segment.to.x - segment.from.x) + Math.abs(segment.to.y - segment.from.y)
+  ), 0);
+  let remaining = totalLength / 2;
+  for (const segment of segments) {
+    const length = Math.abs(segment.to.x - segment.from.x) + Math.abs(segment.to.y - segment.from.y);
+    if (remaining <= length) {
+      const progress = length ? remaining / length : 0;
+      return {
+        x: segment.from.x + (segment.to.x - segment.from.x) * progress,
+        y: segment.from.y + (segment.to.y - segment.from.y) * progress,
+        vertical: segment.from.x === segment.to.x
+      };
+    }
+    remaining -= length;
+  }
+  const fallback = route?.points?.[0] || { x: 0, y: 0 };
+  return { ...fallback, vertical: false };
+}
+
+function positionDiagramBuilderConnectionEditor(session, editor, route, surfaceRect) {
+  if (!editor || !route) return;
+  const center = diagramBuilderRouteCenter(route);
+  const zoom = session.gridZoom || 1;
+  const anchorX = surfaceRect.left + center.x * zoom;
+  const anchorY = surfaceRect.top + center.y * zoom;
+  const rect = editor.getBoundingClientRect();
+  const width = rect.width || 260;
+  const height = rect.height || 94;
+  const viewportPadding = 12;
+  const pointerGap = 20;
+  editor.classList.remove("bubble-above", "bubble-below", "bubble-left", "bubble-right");
+  if (center.vertical) {
+    const rightSpace = window.innerWidth - anchorX;
+    const placeRight = rightSpace >= width + pointerGap + viewportPadding || rightSpace >= anchorX;
+    const left = placeRight
+      ? Math.min(window.innerWidth - width - viewportPadding, anchorX + pointerGap)
+      : Math.max(viewportPadding, anchorX - pointerGap - width);
+    const top = Math.max(viewportPadding, Math.min(window.innerHeight - height - viewportPadding, anchorY - height / 2));
+    editor.style.left = `${left}px`;
+    editor.style.top = `${top}px`;
+    editor.style.setProperty("--bubble-tail-y", `${Math.max(16, Math.min(height - 16, anchorY - top))}px`);
+    editor.classList.add(placeRight ? "bubble-right" : "bubble-left");
+    return;
+  }
+  const placeAbove = anchorY >= height + pointerGap + viewportPadding
+    || window.innerHeight - anchorY < height + pointerGap + viewportPadding;
+  const left = Math.max(viewportPadding, Math.min(window.innerWidth - width - viewportPadding, anchorX - width / 2));
+  const top = placeAbove
+    ? Math.max(viewportPadding, anchorY - pointerGap - height)
+    : Math.min(window.innerHeight - height - viewportPadding, anchorY + pointerGap);
+  editor.style.left = `${left}px`;
+  editor.style.top = `${top}px`;
+  editor.style.setProperty("--bubble-tail-x", `${Math.max(16, Math.min(width - 16, anchorX - left))}px`);
+  editor.classList.add(placeAbove ? "bubble-above" : "bubble-below");
+}
+
+function beginDiagramBuilderUseCaseDependencyEdit(session, connection, route, surfaceRect) {
   session.finishConnectionEditing?.(true);
   session.finishSystemBoundaryEditing?.(true);
   session.finishSequenceFragmentEditing?.(true);
@@ -4838,8 +4897,7 @@ function beginDiagramBuilderUseCaseDependencyEdit(session, connection, clientX, 
   const editor = createElement("div", "diagram-builder-usecase-relation-editor");
   editor.setAttribute("role", "dialog");
   editor.setAttribute("aria-label", "Beziehung zwischen Anwendungsfällen bearbeiten");
-  editor.style.left = `${Math.max(120, Math.min(window.innerWidth - 120, clientX))}px`;
-  editor.style.top = `${Math.max(62, Math.min(window.innerHeight - 62, clientY))}px`;
+  editor.dataset.connectionEditorId = String(connection.id);
   const relation = createElement("select", "diagram-builder-usecase-relation-select");
   relation.setAttribute("aria-label", "Art der Anwendungsfallbeziehung");
   relation.append(
@@ -4853,6 +4911,7 @@ function beginDiagramBuilderUseCaseDependencyEdit(session, connection, clientX, 
   label.setAttribute("aria-label", "Zusatzbeschriftung der Anwendungsfallbeziehung");
   editor.append(relation, label);
   session.overlay.append(editor);
+  positionDiagramBuilderConnectionEditor(session, editor, route, surfaceRect);
   session.editingConnectionId = connection.id;
   let finished = false;
   session.finishConnectionEditing = (save) => {
@@ -4886,7 +4945,7 @@ function beginDiagramBuilderUseCaseDependencyEdit(session, connection, clientX, 
   drawDiagramBuilderConnections(session);
 }
 
-function beginDiagramBuilderConnectionLabelEdit(session, connection, clientX, clientY) {
+function beginDiagramBuilderConnectionLabelEdit(session, connection, route, surfaceRect) {
   session.finishConnectionEditing?.(true);
   session.finishSystemBoundaryEditing?.(true);
   session.finishSequenceFragmentEditing?.(true);
@@ -4899,8 +4958,7 @@ function beginDiagramBuilderConnectionLabelEdit(session, connection, clientX, cl
     targetId: connection.targetId
   };
   const editor = createElement("div", "diagram-builder-connection-label-editor");
-  editor.style.left = `${Math.max(90, Math.min(window.innerWidth - 90, clientX))}px`;
-  editor.style.top = `${Math.max(28, Math.min(window.innerHeight - 28, clientY))}px`;
+  editor.dataset.connectionEditorId = String(connection.id);
   let lineType = null;
   if (session.viewType === "sequence") {
     lineType = createElement("select", "diagram-builder-connection-type-select");
@@ -4926,6 +4984,7 @@ function beginDiagramBuilderConnectionLabelEdit(session, connection, clientX, cl
   if (lineType) editor.append(lineType);
   editor.append(labelInput);
   session.overlay.append(editor);
+  positionDiagramBuilderConnectionEditor(session, editor, route, surfaceRect);
   session.editingConnectionId = connection.id;
   let finished = false;
   session.finishConnectionEditing = (save) => {
@@ -4967,9 +5026,9 @@ function beginDiagramBuilderConnectionLabelEdit(session, connection, clientX, cl
   drawDiagramBuilderConnections(session);
 }
 
-function openDiagramBuilderEndpointMenu(session, connection, endpoint, clientX, clientY) {
+function openDiagramBuilderEndpointMenu(session, connection, endpoint) {
   session.overlay.querySelector(".diagram-builder-endpoint-menu")?.remove();
-  const menu = createElement("div", "diagram-builder-endpoint-menu");
+  const menu = createElement("div", "diagram-builder-endpoint-menu diagram-builder-arrowhead-menu");
   menu.setAttribute("aria-label", `Pfeilspitze am ${endpoint === "start" ? "Anfang" : "Ende"} wählen`);
   const property = endpoint === "start" ? "startMarker" : "endMarker";
   const markerOptions = [
@@ -4981,10 +5040,6 @@ function openDiagramBuilderEndpointMenu(session, connection, endpoint, clientX, 
     ["aggregation", "Aggregation"],
     ["composition", "Komposition"]
   );
-  const menuHalfWidth = 110;
-  const menuHeight = markerOptions.length * 42 + Math.max(0, markerOptions.length - 1) * 6 + 20;
-  menu.style.left = `${Math.max(menuHalfWidth + 8, Math.min(window.innerWidth - menuHalfWidth - 8, clientX))}px`;
-  menu.style.top = `${Math.max(8, Math.min(window.innerHeight - menuHeight - 20, clientY))}px`;
   markerOptions.forEach(([value, label]) => {
     const button = createElement("button", connection[property] === value ? "selected" : "");
     button.type = "button";
@@ -5005,6 +5060,12 @@ function openDiagramBuilderEndpointMenu(session, connection, endpoint, clientX, 
     menu.append(button);
   });
   session.overlay.append(menu);
+  positionDiagramBuilderConnectionEditor(
+    session,
+    menu,
+    session.connectionRoutes.get(connection.id),
+    session.surface.getBoundingClientRect()
+  );
   menu.querySelector("button.selected, button")?.focus({ preventScroll: true });
 }
 
@@ -5093,7 +5154,7 @@ function renderDiagramBuilderEndpointControls(session, connection, route, surfac
       event.stopPropagation();
       if (suppressClick) return;
       if (fixedConnectionStyle) return;
-      openDiagramBuilderEndpointMenu(session, connection, endpoint, event.clientX, event.clientY);
+      openDiagramBuilderEndpointMenu(session, connection, endpoint);
     });
     session.overlay.append(control);
   });
@@ -5430,8 +5491,8 @@ function drawDiagramBuilderConnections(session) {
     connectionGroup.addEventListener("dblclick", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      if (isUseCaseDependency) beginDiagramBuilderUseCaseDependencyEdit(session, connection, event.clientX, event.clientY);
-      else beginDiagramBuilderConnectionLabelEdit(session, connection, event.clientX, event.clientY);
+      if (isUseCaseDependency) beginDiagramBuilderUseCaseDependencyEdit(session, connection, route, surfaceRect);
+      else beginDiagramBuilderConnectionLabelEdit(session, connection, route, surfaceRect);
     });
     connectionGroup.append(hitPath, path);
     layer.append(connectionGroup);
@@ -5455,6 +5516,8 @@ function drawDiagramBuilderConnections(session) {
       label.textContent = visibleConnectionLabel;
       connectionGroup.append(label);
     }
+    const activeEditor = session.overlay.querySelector(`[data-connection-editor-id="${connection.id}"]`);
+    if (activeEditor) positionDiagramBuilderConnectionEditor(session, activeEditor, route, surfaceRect);
     renderDiagramBuilderEndpointControls(session, connection, route, surfaceRect);
   });
 }
