@@ -4686,6 +4686,10 @@ function diagramBuilderPortOnBox(box, side, fraction, isDiamond = false) {
   return { x, y: centerY + verticalExtent * (side === "bottom" ? 1 : -1) };
 }
 
+function diagramBuilderUsesVerticalOnlyPorts(piece) {
+  return piece?.kind === "activity-fork" || piece?.kind === "activity-join";
+}
+
 function diagramBuilderAutomaticSourceSides(session) {
   const sides = new Map();
   session.connections.forEach((connection) => {
@@ -4696,6 +4700,10 @@ function diagramBuilderAutomaticSourceSides(session) {
     const targetSpan = diagramBuilderPlacementSpan(session, target.piece);
     const horizontalDistance = (target.column + targetSpan.columns / 2 - source.column - sourceSpan.columns / 2) * session.cellWidth;
     const verticalDistance = (target.row + targetSpan.rows / 2 - source.row - sourceSpan.rows / 2) * session.cellHeight;
+    if (diagramBuilderUsesVerticalOnlyPorts(source.piece)) {
+      sides.set(connection.id, verticalDistance < 0 ? "top" : "bottom");
+      return;
+    }
     if (source.piece.kind === "pap-decision-table") {
       sides.set(connection.id, horizontalDistance < 0 ? "left" : "right");
       return;
@@ -4709,6 +4717,26 @@ function diagramBuilderAutomaticSourceSides(session) {
     } else {
       sides.set(connection.id, verticalDistance < 0 ? "top" : "bottom");
     }
+  });
+  return sides;
+}
+
+function diagramBuilderAutomaticTargetSides(session, sourceSides) {
+  const sides = new Map();
+  session.connections.forEach((connection) => {
+    const source = session.placements.find((placement) => placement.id === connection.sourceId);
+    const target = session.placements.find((placement) => placement.id === connection.targetId);
+    if (!source || !target) return;
+    if (diagramBuilderUsesVerticalOnlyPorts(target.piece)) {
+      const sourceSpan = diagramBuilderPlacementSpan(session, source.piece);
+      const targetSpan = diagramBuilderPlacementSpan(session, target.piece);
+      const sourceCenterY = source.row + sourceSpan.rows / 2;
+      const targetCenterY = target.row + targetSpan.rows / 2;
+      sides.set(connection.id, sourceCenterY <= targetCenterY ? "top" : "bottom");
+      return;
+    }
+    const sourceSide = sourceSides.get(connection.id) || "right";
+    sides.set(connection.id, sourceSide === "left" ? "right" : sourceSide === "right" ? "left" : sourceSide === "top" ? "bottom" : "top");
   });
   return sides;
 }
@@ -4749,12 +4777,11 @@ function diagramBuilderSourcePortAssignments(session, sourceSides) {
   return assignments;
 }
 
-function diagramBuilderTargetPortAssignments(session, sourceSides) {
+function diagramBuilderTargetPortAssignments(session, targetSides) {
   const assignments = new Map();
   const groups = new Map();
   session.connections.forEach((connection) => {
-    const sourceSide = sourceSides.get(connection.id) || "right";
-    const targetSide = sourceSide === "left" ? "right" : sourceSide === "right" ? "left" : sourceSide === "top" ? "bottom" : "top";
+    const targetSide = targetSides.get(connection.id) || "left";
     const key = `${connection.targetId}:${targetSide}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(connection);
@@ -5163,8 +5190,9 @@ function drawDiagramBuilderConnections(session) {
   const zoom = session.gridZoom || 1;
   const routedSegments = [];
   const automaticSourceSides = diagramBuilderAutomaticSourceSides(session);
+  const automaticTargetSides = diagramBuilderAutomaticTargetSides(session, automaticSourceSides);
   const sourcePortAssignments = diagramBuilderSourcePortAssignments(session, automaticSourceSides);
-  const targetPortAssignments = diagramBuilderTargetPortAssignments(session, automaticSourceSides);
+  const targetPortAssignments = diagramBuilderTargetPortAssignments(session, automaticTargetSides);
   const nodeRects = session.placements.map((placement) => {
     const node = session.surface.querySelector(`[data-placement-id="${placement.id}"] .diagram-builder-piece`);
     if (!node) return null;
@@ -5216,7 +5244,9 @@ function drawDiagramBuilderConnections(session) {
         bottom: height - sourceBox.bottom,
         top: sourceBox.top
       };
-      const possibleSides = session.viewType === "sequence" || source.piece.kind === "pap-decision-table"
+      const possibleSides = diagramBuilderUsesVerticalOnlyPorts(source.piece)
+        ? ["bottom", "top"]
+        : session.viewType === "sequence" || source.piece.kind === "pap-decision-table"
         ? ["right", "left"]
         : ["right", "left", "bottom", "top"];
       sourceSide = possibleSides.sort((left, right) => availableSpace[right] - availableSpace[left])[0];
@@ -5256,14 +5286,10 @@ function drawDiagramBuilderConnections(session) {
       if (sourceSide === "top") sourceBoundary.y = sourceBox.top - selfLoopOffset;
     }
     const preferredTargetSide = isSelfConnection
-      ? sourceSide
-      : sourceSide === "left"
-      ? "right"
-      : sourceSide === "right"
-        ? "left"
-        : sourceSide === "top"
-          ? "bottom"
-          : "top";
+      ? diagramBuilderUsesVerticalOnlyPorts(target.piece)
+        ? sourceSide === "top" ? "bottom" : "top"
+        : sourceSide
+      : automaticTargetSides.get(connection.id) || "left";
     const targetSides = [preferredTargetSide];
     const routeCandidates = [];
     const laneOffsets = [0];
@@ -5513,6 +5539,8 @@ function createDiagramBuilderPlacedNode(session, placement) {
       ["right", "→", actionIndex, fraction],
       ["left", "←", actionIndex, fraction]
     ])
+    : diagramBuilderUsesVerticalOnlyPorts(placement.piece)
+    ? [["top", "↑"], ["bottom", "↓"]]
     : session.viewType === "sequence"
     ? (placement.piece.kind === "sequence-activation" ? [["right", "→"], ["left", "←"]] : [])
     : [
