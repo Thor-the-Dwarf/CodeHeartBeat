@@ -2663,8 +2663,8 @@ function highlightDiagramBuilderCodeLine(session, lineIndex) {
 
 const DIAGRAM_BUILDER_DEFAULT_CELL_WIDTH = 140;
 const DIAGRAM_BUILDER_DEFAULT_CELL_HEIGHT = 100;
-const DIAGRAM_BUILDER_CLASS_CELL_WIDTH = 210;
-const DIAGRAM_BUILDER_CLASS_CELL_HEIGHT = 130;
+const DIAGRAM_BUILDER_CLASS_CELL_WIDTH = 270;
+const DIAGRAM_BUILDER_CLASS_CELL_HEIGHT = 170;
 const DIAGRAM_BUILDER_DECISION_RULE_COUNT = 4;
 
 function diagramBuilderDecisionTableRows(piece, key, fallbackValue) {
