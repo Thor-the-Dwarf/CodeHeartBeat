@@ -1154,10 +1154,10 @@ body.folder-tree-resizing {
 }
 
 .diagram-builder-palette {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(80px, 1fr));
+  display: flex;
+  flex-wrap: nowrap;
   align-items: center;
-  justify-items: center;
+  justify-content: space-between;
   gap: 16px;
   min-height: 78px;
   height: auto;
@@ -1165,6 +1165,7 @@ body.folder-tree-resizing {
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-color: #493653 #100d17;
+  scrollbar-width: thin;
 }
 
 .diagram-builder-palette-item {
