@@ -2672,6 +2672,8 @@ const DIAGRAM_BUILDER_DEFAULT_CELL_WIDTH = 140;
 const DIAGRAM_BUILDER_DEFAULT_CELL_HEIGHT = 100;
 const DIAGRAM_BUILDER_CLASS_CELL_WIDTH = 270;
 const DIAGRAM_BUILDER_CLASS_CELL_HEIGHT = 170;
+const DIAGRAM_BUILDER_PAP_CELL_WIDTH = 220;
+const DIAGRAM_BUILDER_PAP_CELL_HEIGHT = 160;
 const DIAGRAM_BUILDER_DECISION_RULE_COUNT = 4;
 
 function diagramBuilderDecisionTableRows(piece, key, fallbackValue) {
@@ -2743,20 +2745,9 @@ function diagramBuilderPieceMetrics(piece) {
     return { elementWidth, elementHeight, labelWidth: elementWidth - 28, visualWidth: elementWidth, visualHeight: elementHeight };
   }
   if (piece.kind === "pap-decision-table") {
-    const conditions = diagramBuilderDecisionTableRows(piece, "conditions", "J");
-    const actions = diagramBuilderDecisionTableRows(piece, "actions", "-");
-    const longestLabel = Math.max(
-      0,
-      text.length,
-      ...conditions.map((row) => row.label.length),
-      ...actions.map((row) => row.label.length)
-    );
-    const descriptionWidth = Math.min(280, Math.max(180, longestLabel * 6 + 72));
-    const elementWidth = 32 + descriptionWidth + DIAGRAM_BUILDER_DECISION_RULE_COUNT * 48;
-    const conditionHeight = Math.max(120, conditions.length * 34);
-    const actionHeight = Math.max(120, actions.length * 34);
-    const elementHeight = 59 + conditionHeight + actionHeight + 12;
-    return { elementWidth, elementHeight, labelWidth: descriptionWidth, visualWidth: elementWidth, visualHeight: elementHeight };
+    const elementWidth = DIAGRAM_BUILDER_PAP_CELL_WIDTH * 2 - 20;
+    const elementHeight = DIAGRAM_BUILDER_PAP_CELL_HEIGHT * 2 - 20;
+    return { elementWidth, elementHeight, labelWidth: 212, visualWidth: elementWidth, visualHeight: elementHeight };
   }
   const fixedMetrics = {
     "class-package": [170, 90],
@@ -2795,6 +2786,7 @@ function applyDiagramBuilderPieceMetrics(node, piece) {
 }
 
 function diagramBuilderPlacementSpan(session, piece) {
+  if (piece.kind === "pap-decision-table") return { columns: 2, rows: 2 };
   if (session.viewType !== "class" || !diagramBuilderIsClassifier(piece)) return { columns: 1, rows: 1 };
   const metrics = diagramBuilderPieceMetrics(piece);
   return {
@@ -2814,9 +2806,12 @@ function updateDiagramBuilderGridMetrics(session) {
   if (session.viewType === "class") {
     session.cellWidth = DIAGRAM_BUILDER_CLASS_CELL_WIDTH;
     session.cellHeight = DIAGRAM_BUILDER_CLASS_CELL_HEIGHT;
+  } else if (session.viewType === "pap") {
+    session.cellWidth = DIAGRAM_BUILDER_PAP_CELL_WIDTH;
+    session.cellHeight = DIAGRAM_BUILDER_PAP_CELL_HEIGHT;
   } else {
     const metrics = session.placements
-      .filter((placement) => placement.piece.kind !== "sequence-activation")
+      .filter((placement) => !["sequence-activation", "pap-decision-table"].includes(placement.piece.kind))
       .map((placement) => diagramBuilderPieceMetrics(placement.piece));
     const largestWidth = metrics.length ? Math.max(...metrics.map((item) => item.visualWidth)) : 0;
     const largestHeight = metrics.length ? Math.max(...metrics.map((item) => item.visualHeight)) : 0;

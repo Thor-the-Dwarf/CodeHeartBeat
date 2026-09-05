@@ -3252,16 +3252,23 @@ body.folder-tree-resizing {
 .diagram-builder-piece.pap-decision-table,
 .diagram-builder-palette-item.pap-decision-table {
   padding: 0;
+  overflow: auto;
   border-radius: 0;
   border-color: #4d83c4;
   color: #eaf1fb;
   background: #111925;
 }
 
+.diagram-builder-cell-item .diagram-builder-piece.pap-decision-table {
+  height: var(--builder-piece-height);
+  max-height: var(--builder-piece-height);
+}
+
 .diagram-builder-palette-item.pap-decision-table {
   width: 210px;
   min-width: 210px;
   min-height: 92px;
+  overflow: hidden;
 }
 
 .diagram-builder-decision-preview {
