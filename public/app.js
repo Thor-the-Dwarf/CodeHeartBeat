@@ -2674,21 +2674,40 @@ const DIAGRAM_BUILDER_CLASS_CELL_WIDTH = 270;
 const DIAGRAM_BUILDER_CLASS_CELL_HEIGHT = 170;
 const DIAGRAM_BUILDER_PAP_CELL_WIDTH = 220;
 const DIAGRAM_BUILDER_PAP_CELL_HEIGHT = 160;
-const DIAGRAM_BUILDER_DECISION_RULE_COUNT = 4;
+const DIAGRAM_BUILDER_MIN_DECISION_RULE_COUNT = 3;
+
+function diagramBuilderDecisionRuleCount(piece) {
+  const storedCount = Number(piece?.ruleCount) || 0;
+  const rowCounts = ["conditions", "actions"].flatMap((key) => (
+    Array.isArray(piece?.[key]) ? piece[key].map((row) => row?.values?.length || 0) : []
+  ));
+  return Math.max(DIAGRAM_BUILDER_MIN_DECISION_RULE_COUNT, storedCount, ...rowCounts);
+}
 
 function diagramBuilderDecisionTableRows(piece, key, fallbackValue) {
+  const ruleCount = diagramBuilderDecisionRuleCount(piece);
   const rows = Array.isArray(piece?.[key]) ? piece[key] : [];
   const normalized = rows.map((row) => ({
     label: String(row?.label || ""),
     values: Array.from(
-      { length: DIAGRAM_BUILDER_DECISION_RULE_COUNT },
+      { length: ruleCount },
       (_, index) => String(row?.values?.[index] || fallbackValue)
     )
   }));
   return normalized.length ? normalized : [{
     label: "",
-    values: Array(DIAGRAM_BUILDER_DECISION_RULE_COUNT).fill(fallbackValue)
+    values: Array(ruleCount).fill(fallbackValue)
   }];
+}
+
+function showDiagramBuilderNotice(session, message) {
+  session.overlay.querySelector(".diagram-builder-notice-toast")?.remove();
+  const notice = createElement("div", "diagram-builder-notice-toast", message);
+  notice.setAttribute("role", "status");
+  notice.setAttribute("aria-live", "polite");
+  session.overlay.append(notice);
+  window.setTimeout(() => notice.classList.add("leaving"), 1800);
+  window.setTimeout(() => notice.remove(), 2150);
 }
 
 function diagramBuilderDecisionActionPortFraction(piece, metrics = diagramBuilderPieceMetrics(piece)) {
@@ -3165,9 +3184,11 @@ function beginDiagramBuilderDecisionTableEdit(session, placement, node) {
   const piece = placement.piece;
   const original = {
     label: piece.label || "",
+    ruleCount: diagramBuilderDecisionRuleCount(piece),
     conditions: diagramBuilderDecisionTableRows(piece, "conditions", "J").map((row) => ({ ...row, values: [...row.values] })),
     actions: diagramBuilderDecisionTableRows(piece, "actions", "-").map((row) => ({ ...row, values: [...row.values] }))
   };
+  let ruleCount = original.ruleCount;
   const editor = createElement("div", "diagram-builder-decision-editor");
   const table = createElement("table", "diagram-builder-decision-table editing-table");
   const head = document.createElement("thead");
@@ -3184,16 +3205,27 @@ function beginDiagramBuilderDecisionTableEdit(session, placement, node) {
   titleCell.append(titleInput);
   const rulesTitle = document.createElement("th");
   rulesTitle.className = "diagram-builder-decision-rules-title";
-  rulesTitle.colSpan = DIAGRAM_BUILDER_DECISION_RULE_COUNT;
-  rulesTitle.textContent = "Regeln";
+  rulesTitle.colSpan = ruleCount;
+  const rulesToolbar = createElement("div", "diagram-builder-decision-rules-toolbar");
+  const addRuleButton = createElement("button", "diagram-builder-decision-rule-button add", "+");
+  addRuleButton.type = "button";
+  addRuleButton.title = "Regel hinzufügen";
+  addRuleButton.setAttribute("aria-label", addRuleButton.title);
+  const removeRuleButton = createElement("button", "diagram-builder-decision-rule-button remove", "−");
+  removeRuleButton.type = "button";
+  removeRuleButton.title = "Letzte Regel löschen";
+  removeRuleButton.setAttribute("aria-label", removeRuleButton.title);
+  rulesToolbar.append(createElement("strong", "", "Regeln"), removeRuleButton, addRuleButton);
+  rulesTitle.append(rulesToolbar);
   titleRow.append(titleCell, rulesTitle);
   const ruleRow = document.createElement("tr");
-  for (let ruleIndex = 0; ruleIndex < DIAGRAM_BUILDER_DECISION_RULE_COUNT; ruleIndex += 1) {
+  const appendRuleHeader = (ruleIndex) => {
     const rule = document.createElement("th");
     rule.className = "diagram-builder-decision-rule-head";
     rule.textContent = `R${ruleIndex + 1}`;
     ruleRow.append(rule);
-  }
+  };
+  for (let ruleIndex = 0; ruleIndex < ruleCount; ruleIndex += 1) appendRuleHeader(ruleIndex);
   head.append(titleRow, ruleRow);
   table.append(head);
 
@@ -3214,7 +3246,7 @@ function beginDiagramBuilderDecisionTableEdit(session, placement, node) {
       band.append(createElement("span", "diagram-builder-decision-group-label", title), addButton);
       firstRow.prepend(band);
     };
-    const appendRow = (rowData = { label: "", values: Array(DIAGRAM_BUILDER_DECISION_RULE_COUNT).fill(fallbackValue) }) => {
+    const appendRow = (rowData = { label: "", values: Array(ruleCount).fill(fallbackValue) }) => {
       const row = createElement("tr", "diagram-builder-decision-editor-row");
       const labelCell = document.createElement("th");
       labelCell.className = "diagram-builder-decision-label-cell";
@@ -3236,7 +3268,7 @@ function beginDiagramBuilderDecisionTableEdit(session, placement, node) {
       labelEditor.append(dragHandle, input, removeButton);
       labelCell.append(labelEditor);
       row.append(labelCell);
-      for (let ruleIndex = 0; ruleIndex < DIAGRAM_BUILDER_DECISION_RULE_COUNT; ruleIndex += 1) {
+      for (let ruleIndex = 0; ruleIndex < ruleCount; ruleIndex += 1) {
         const valueCell = document.createElement("td");
         valueCell.append(createDiagramBuilderDecisionSelect(
           rowData.values[ruleIndex] || fallbackValue,
@@ -3306,6 +3338,18 @@ function beginDiagramBuilderDecisionTableEdit(session, placement, node) {
     });
     return {
       body,
+      appendRule: () => {
+        body.querySelectorAll(".diagram-builder-decision-editor-row").forEach((row) => {
+          const valueCell = document.createElement("td");
+          valueCell.append(createDiagramBuilderDecisionSelect(
+            fallbackValue,
+            options,
+            `${singular}, Regel ${ruleCount}`
+          ));
+          row.append(valueCell);
+        });
+      },
+      removeRule: () => body.querySelectorAll(".diagram-builder-decision-editor-row").forEach((row) => row.lastElementChild?.remove()),
       values: () => Array.from(body.querySelectorAll(".diagram-builder-decision-editor-row"), (row) => ({
         label: row.querySelector(".diagram-builder-decision-label-input")?.value.trim() || "",
         values: Array.from(row.querySelectorAll("select"), (select) => select.value)
@@ -3317,11 +3361,38 @@ function beginDiagramBuilderDecisionTableEdit(session, placement, node) {
   const separator = createElement("tbody", "diagram-builder-decision-separator");
   const separatorRow = document.createElement("tr");
   const separatorCell = document.createElement("td");
-  separatorCell.colSpan = DIAGRAM_BUILDER_DECISION_RULE_COUNT + 2;
+  separatorCell.colSpan = ruleCount + 2;
   separatorRow.append(separatorCell);
   separator.append(separatorRow);
   const actions = createGroup("actions", "Aktionen", original.actions, ["-", "X"], "-");
   table.append(conditions.body, separator, actions.body);
+  addRuleButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    ruleCount += 1;
+    rulesTitle.colSpan = ruleCount;
+    separatorCell.colSpan = ruleCount + 2;
+    appendRuleHeader(ruleCount - 1);
+    conditions.appendRule();
+    actions.appendRule();
+    addRuleButton.focus({ preventScroll: true });
+  });
+  removeRuleButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (ruleCount <= DIAGRAM_BUILDER_MIN_DECISION_RULE_COUNT) {
+      showDiagramBuilderNotice(session, "Entscheidungsraute empfohlen");
+      removeRuleButton.focus({ preventScroll: true });
+      return;
+    }
+    ruleRow.lastElementChild?.remove();
+    conditions.removeRule();
+    actions.removeRule();
+    ruleCount -= 1;
+    rulesTitle.colSpan = ruleCount;
+    separatorCell.colSpan = ruleCount + 2;
+    removeRuleButton.focus({ preventScroll: true });
+  });
   editor.append(table);
   node.replaceChildren(editor);
   node.classList.add("editing", "decision-table-editing");
@@ -3332,6 +3403,7 @@ function beginDiagramBuilderDecisionTableEdit(session, placement, node) {
     finished = true;
     if (save) {
       piece.label = titleInput.value.trim();
+      piece.ruleCount = ruleCount;
       piece.conditions = conditions.values();
       piece.actions = actions.values();
     } else Object.assign(piece, original);
@@ -3864,6 +3936,7 @@ function appendDiagramBuilderDecisionTableContent(node, piece, labelText) {
   }
   const conditions = diagramBuilderDecisionTableRows(piece, "conditions", "J");
   const actions = diagramBuilderDecisionTableRows(piece, "actions", "-");
+  const ruleCount = diagramBuilderDecisionRuleCount(piece);
   const table = createElement("table", "diagram-builder-decision-table");
   const head = document.createElement("thead");
   const titleRow = document.createElement("tr");
@@ -3874,11 +3947,11 @@ function appendDiagramBuilderDecisionTableContent(node, piece, labelText) {
   title.textContent = labelText || "Entscheidungstabelle";
   const rulesTitle = document.createElement("th");
   rulesTitle.className = "diagram-builder-decision-rules-title";
-  rulesTitle.colSpan = DIAGRAM_BUILDER_DECISION_RULE_COUNT;
+  rulesTitle.colSpan = ruleCount;
   rulesTitle.textContent = "Regeln";
   titleRow.append(title, rulesTitle);
   const ruleRow = document.createElement("tr");
-  for (let ruleIndex = 0; ruleIndex < DIAGRAM_BUILDER_DECISION_RULE_COUNT; ruleIndex += 1) {
+  for (let ruleIndex = 0; ruleIndex < ruleCount; ruleIndex += 1) {
     const rule = document.createElement("th");
     rule.className = "diagram-builder-decision-rule-head";
     rule.textContent = `R${ruleIndex + 1}`;
@@ -3910,7 +3983,7 @@ function appendDiagramBuilderDecisionTableContent(node, piece, labelText) {
   const separator = createElement("tbody", "diagram-builder-decision-separator");
   const separatorRow = document.createElement("tr");
   const separatorCell = document.createElement("td");
-  separatorCell.colSpan = DIAGRAM_BUILDER_DECISION_RULE_COUNT + 2;
+  separatorCell.colSpan = ruleCount + 2;
   separatorRow.append(separatorCell);
   separator.append(separatorRow);
   table.append(separator);
