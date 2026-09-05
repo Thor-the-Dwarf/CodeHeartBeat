@@ -1904,6 +1904,315 @@ body.folder-tree-resizing {
   transform: translate(-50%, -50%);
 }
 
+/* Gemeinsame Zeichenlogik, aber diagrammspezifische Standardformen. */
+.diagram-builder-cell-item .diagram-builder-piece.class-box,
+.diagram-builder-cell-item .diagram-builder-piece.class-interface,
+.diagram-builder-cell-item .diagram-builder-piece.class-enum,
+.diagram-builder-cell-item .diagram-builder-piece.class-package,
+.diagram-builder-cell-item .diagram-builder-piece.state,
+.diagram-builder-cell-item .diagram-builder-piece.usecase,
+.diagram-builder-cell-item .diagram-builder-piece.boundary,
+.diagram-builder-cell-item .diagram-builder-piece.sequence-object,
+.diagram-builder-cell-item .diagram-builder-piece.sequence-fragment,
+.diagram-builder-cell-item .diagram-builder-piece.pap-decision-table {
+  width: var(--builder-piece-width);
+  max-width: none;
+  min-height: var(--builder-piece-height);
+}
+
+.diagram-builder-piece.class-box,
+.diagram-builder-piece.class-interface,
+.diagram-builder-piece.class-enum,
+.diagram-builder-palette-item.class-box,
+.diagram-builder-palette-item.class-interface,
+.diagram-builder-palette-item.class-enum {
+  border-radius: 0;
+  border-color: #9fb2c9;
+  background:
+    linear-gradient(#9fb2c9, #9fb2c9) 0 42% / 100% 1px no-repeat,
+    linear-gradient(#9fb2c9, #9fb2c9) 0 72% / 100% 1px no-repeat,
+    #172231;
+}
+
+.diagram-builder-piece.class-interface::before,
+.diagram-builder-piece.class-enum::before {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  width: 100%;
+  color: #9aabc0;
+  content: "«interface»";
+  font: 600 7px/1 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  text-align: center;
+}
+
+.diagram-builder-piece.class-enum::before {
+  content: "«enumeration»";
+}
+
+.diagram-builder-piece.class-package,
+.diagram-builder-palette-item.class-package {
+  border-radius: 0;
+  border-color: #c2a765;
+  background: #2b261c;
+}
+
+.diagram-builder-piece.class-package::before,
+.diagram-builder-palette-item.class-package::before {
+  position: absolute;
+  top: -9px;
+  left: -1px;
+  width: 42%;
+  height: 9px;
+  border: 1px solid #c2a765;
+  border-bottom: 0;
+  content: "";
+  background: #2b261c;
+}
+
+.diagram-builder-piece.state,
+.diagram-builder-palette-item.state {
+  border-radius: 14px;
+  border-color: #80a9c4;
+  background:
+    linear-gradient(#80a9c4, #80a9c4) 0 42% / 100% 1px no-repeat,
+    #152532;
+}
+
+.diagram-builder-piece.state-choice,
+.diagram-builder-palette-item.state-choice,
+.diagram-builder-piece.pap-decision,
+.diagram-builder-palette-item.pap-decision {
+  min-width: var(--builder-piece-width, 72px);
+  width: var(--builder-piece-width, 72px);
+  min-height: var(--builder-piece-height, 72px);
+  height: var(--builder-piece-height, 72px);
+  padding: 5px;
+  border: 0;
+  border-radius: 0;
+  background: #d2b66f;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  transform: none;
+}
+
+.diagram-builder-piece.state-choice::before,
+.diagram-builder-palette-item.state-choice::before,
+.diagram-builder-piece.pap-decision::before,
+.diagram-builder-palette-item.pap-decision::before {
+  position: absolute;
+  z-index: 0;
+  inset: 1px;
+  content: "";
+  background: #30271a;
+  clip-path: inherit;
+}
+
+.diagram-builder-piece.state-choice .diagram-builder-piece-label,
+.diagram-builder-palette-item.state-choice .diagram-builder-piece-label,
+.diagram-builder-piece.pap-decision .diagram-builder-piece-label,
+.diagram-builder-palette-item.pap-decision .diagram-builder-piece-label {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  width: var(--builder-label-width, 78px);
+  color: #ffe2a6;
+  transform: translate(-50%, -50%);
+}
+
+.diagram-builder-piece.state-choice .diagram-builder-label-editor,
+.diagram-builder-piece.pap-decision .diagram-builder-label-editor {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  width: var(--builder-label-width, 80px);
+  transform: translate(-50%, -50%);
+}
+
+.diagram-builder-piece.state-start,
+.diagram-builder-piece.state-end,
+.diagram-builder-palette-item.state-start,
+.diagram-builder-palette-item.state-end {
+  min-width: 28px;
+  width: 28px;
+  min-height: 28px;
+  height: 28px;
+  padding: 0;
+  overflow: visible;
+  border: 2px solid #dbe4ee;
+  border-radius: 50%;
+  color: transparent;
+  background: #dbe4ee;
+}
+
+.diagram-builder-piece.state-end,
+.diagram-builder-palette-item.state-end {
+  background: #080b11;
+  box-shadow: inset 0 0 0 4px #dbe4ee;
+}
+
+.diagram-builder-piece.state-start .diagram-builder-piece-label,
+.diagram-builder-piece.state-end .diagram-builder-piece-label,
+.diagram-builder-palette-item.state-start .diagram-builder-piece-label,
+.diagram-builder-palette-item.state-end .diagram-builder-piece-label {
+  position: absolute;
+  top: 34px;
+  left: 50%;
+  width: 110px;
+  color: #cfd7e5;
+  transform: translateX(-50%);
+}
+
+.diagram-builder-piece.state-start .diagram-builder-label-editor,
+.diagram-builder-piece.state-end .diagram-builder-label-editor {
+  position: absolute;
+  top: 34px;
+  left: 50%;
+  width: 110px;
+  color: #fff;
+  transform: translateX(-50%);
+}
+
+.diagram-builder-piece.actor,
+.diagram-builder-piece.sequence-actor,
+.diagram-builder-palette-item.actor,
+.diagram-builder-palette-item.sequence-actor {
+  min-width: 80px;
+  width: 80px;
+  min-height: 90px;
+  height: 90px;
+  padding: 0 4px 3px;
+  overflow: visible;
+  border-color: transparent;
+  background:
+    radial-gradient(circle at 50% 13px, transparent 0 9px, #dbe4ee 9px 11px, transparent 11px),
+    linear-gradient(#dbe4ee, #dbe4ee) 50% 25px / 2px 31px no-repeat,
+    linear-gradient(32deg, transparent 47%, #dbe4ee 48% 51%, transparent 52%) 50% 48px / 42px 27px no-repeat,
+    linear-gradient(-32deg, transparent 47%, #dbe4ee 48% 51%, transparent 52%) 50% 48px / 42px 27px no-repeat,
+    linear-gradient(62deg, transparent 47%, #dbe4ee 48% 51%, transparent 52%) 50% 25px / 46px 27px no-repeat,
+    linear-gradient(-62deg, transparent 47%, #dbe4ee 48% 51%, transparent 52%) 50% 25px / 46px 27px no-repeat;
+  box-shadow: none;
+}
+
+.diagram-builder-piece.actor .diagram-builder-piece-label,
+.diagram-builder-piece.sequence-actor .diagram-builder-piece-label,
+.diagram-builder-palette-item.actor .diagram-builder-piece-label,
+.diagram-builder-palette-item.sequence-actor .diagram-builder-piece-label {
+  position: absolute;
+  right: -20px;
+  bottom: 0;
+  left: -20px;
+  width: auto;
+}
+
+.diagram-builder-piece.boundary,
+.diagram-builder-palette-item.boundary {
+  border-radius: 0;
+  border-color: #aeb8c8;
+  background: rgba(14, 18, 26, 0.35);
+}
+
+.diagram-builder-cell-item .diagram-builder-piece.boundary {
+  width: var(--builder-piece-width, 330px);
+  min-width: 330px;
+  min-height: 240px;
+  align-content: start;
+}
+
+.diagram-builder-piece.sequence-object,
+.diagram-builder-palette-item.sequence-object {
+  border-radius: 0;
+  border-color: #9fb2c9;
+  background: #202838;
+}
+
+.diagram-builder-piece.sequence-object::after {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  height: calc(var(--builder-cell-height, 100px) / 2);
+  border-left: 1px dashed #7c8da3;
+  content: "";
+}
+
+.diagram-builder-piece.sequence-activation,
+.diagram-builder-palette-item.sequence-activation {
+  min-width: 14px;
+  width: 14px;
+  min-height: 72px;
+  height: 72px;
+  padding: 0;
+  border-radius: 0;
+  border-color: #9fb2c9;
+  background: #293548;
+}
+
+.diagram-builder-palette-item.sequence-activation {
+  margin: 0 42px;
+  overflow: visible;
+}
+
+.diagram-builder-palette-item.sequence-activation .diagram-builder-piece-label {
+  position: absolute;
+  top: 76px;
+  left: 50%;
+  width: 120px;
+  color: #cfd7e5;
+  transform: translateX(-50%);
+}
+
+.diagram-builder-piece.sequence-fragment,
+.diagram-builder-palette-item.sequence-fragment {
+  border-radius: 0;
+  border-color: #9fb2c9;
+  background: linear-gradient(135deg, #293548 0 35px, transparent 36px), rgba(15, 20, 30, 0.82);
+}
+
+.diagram-builder-cell-item .diagram-builder-piece.sequence-fragment {
+  min-width: 240px;
+  min-height: 120px;
+  align-content: start;
+}
+
+.diagram-builder-piece.pap-process,
+.diagram-builder-palette-item.pap-process {
+  border-radius: 0;
+  border-color: #9fb4c9;
+  background: #203047;
+}
+
+.diagram-builder-piece.pap-start,
+.diagram-builder-piece.pap-end,
+.diagram-builder-palette-item.pap-start,
+.diagram-builder-palette-item.pap-end {
+  border-radius: 999px;
+  border-color: #9fb4c9;
+  background: #203047;
+}
+
+.diagram-builder-piece.pap-output,
+.diagram-builder-palette-item.pap-output {
+  border: 0;
+  border-radius: 0;
+  background: #20344a;
+  clip-path: polygon(9% 0, 100% 0, 91% 100%, 0 100%);
+  box-shadow: inset 0 0 0 1px #9fb4c9;
+}
+
+.diagram-builder-piece.pap-decision-table,
+.diagram-builder-palette-item.pap-decision-table {
+  border-radius: 0;
+  border-color: #4d83c4;
+  color: #f6d768;
+  background:
+    linear-gradient(#718096, #718096) 0 34% / 100% 1px no-repeat,
+    linear-gradient(#718096, #718096) 0 56% / 100% 1px no-repeat,
+    linear-gradient(#718096, #718096) 0 78% / 100% 1px no-repeat,
+    linear-gradient(90deg, transparent 0 46%, #718096 46% calc(46% + 1px), transparent calc(46% + 1px) 64%, #718096 64% calc(64% + 1px), transparent calc(64% + 1px) 82%, #718096 82% calc(82% + 1px), transparent calc(82% + 1px)),
+    #17283f;
+}
+
 .diagram-builder-connectors {
   position: absolute;
   z-index: 1;

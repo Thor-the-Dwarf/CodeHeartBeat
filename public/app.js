@@ -2599,14 +2599,51 @@ function diagramBuilderPiece(kind, paletteLabel) {
   return { kind, label: "", paletteLabel, lineIndex: null };
 }
 
-function createDiagramBuilderPieces(file) {
-  return [
-    diagramBuilderPiece("activity-start", "Start"),
-    diagramBuilderPiece("activity-action", "Aktion"),
-    diagramBuilderPiece("activity-decision", "Entscheidung"),
-    diagramBuilderPiece("activity-end", "Ende"),
-    diagramBuilderPiece("activity-swimlane", "Swimlane")
-  ];
+function diagramBuilderIsDiamond(piece) {
+  return ["activity-decision", "state-choice", "pap-decision"].includes(piece?.kind);
+}
+
+function createDiagramBuilderPieces(file, viewType = "activity") {
+  const piecesByView = {
+    class: [
+      diagramBuilderPiece("class-box", "Klasse"),
+      diagramBuilderPiece("class-interface", "Interface"),
+      diagramBuilderPiece("class-enum", "Enumeration"),
+      diagramBuilderPiece("class-package", "Paket")
+    ],
+    state: [
+      diagramBuilderPiece("state-start", "Startzustand"),
+      diagramBuilderPiece("state", "Zustand"),
+      diagramBuilderPiece("state-choice", "Verzweigung"),
+      diagramBuilderPiece("state-end", "Endzustand")
+    ],
+    usecase: [
+      diagramBuilderPiece("actor", "Aktor"),
+      diagramBuilderPiece("usecase", "Anwendungsfall"),
+      diagramBuilderPiece("boundary", "Systemgrenze")
+    ],
+    activity: [
+      diagramBuilderPiece("activity-start", "Start"),
+      diagramBuilderPiece("activity-action", "Aktion"),
+      diagramBuilderPiece("activity-decision", "Entscheidung"),
+      diagramBuilderPiece("activity-end", "Ende"),
+      diagramBuilderPiece("activity-swimlane", "Swimlane")
+    ],
+    sequence: [
+      diagramBuilderPiece("sequence-actor", "Aktor"),
+      diagramBuilderPiece("sequence-object", "Objekt"),
+      diagramBuilderPiece("sequence-activation", "Aktivitätsbalken"),
+      diagramBuilderPiece("sequence-fragment", "Kombiniertes Fragment")
+    ],
+    pap: [
+      diagramBuilderPiece("pap-start", "Start"),
+      diagramBuilderPiece("pap-process", "Verarbeitung"),
+      diagramBuilderPiece("pap-decision-table", "Entscheidungstabelle"),
+      diagramBuilderPiece("pap-output", "Ein-/Ausgabe"),
+      diagramBuilderPiece("pap-end", "Ende")
+    ]
+  };
+  return piecesByView[viewType] || piecesByView.activity;
 }
 
 function highlightDiagramBuilderCodeLine(session, lineIndex) {
@@ -2620,14 +2657,14 @@ const DIAGRAM_BUILDER_DEFAULT_CELL_HEIGHT = 100;
 function diagramBuilderPieceMetrics(piece) {
   const text = String(piece.label || "");
   const logicalLines = text.split("\n");
-  if (piece.kind === "activity-start" || piece.kind === "activity-end") {
+  if (["activity-start", "activity-end", "state-start", "state-end"].includes(piece.kind)) {
     const charactersPerLine = 36;
     const lineCount = Math.max(1, logicalLines.reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / charactersPerLine)), 0));
     const labelCharacters = Math.min(charactersPerLine, Math.max(1, ...logicalLines.map((line) => line.length)));
     const labelWidth = text ? Math.max(70, labelCharacters * 6 + 18) : 28;
     return { elementWidth: 28, elementHeight: 28, labelWidth, visualWidth: labelWidth, visualHeight: text ? 38 + lineCount * 14 : 28 };
   }
-  if (piece.kind === "activity-decision") {
+  if (["activity-decision", "state-choice", "pap-decision"].includes(piece.kind)) {
     const charactersPerLine = 22;
     const lineCount = Math.max(1, logicalLines.reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / charactersPerLine)), 0));
     const labelCharacters = Math.min(charactersPerLine, Math.max(1, ...logicalLines.map((line) => line.length)));
@@ -2635,6 +2672,25 @@ function diagramBuilderPieceMetrics(piece) {
     const labelHeight = lineCount * 14;
     const diamondSize = Math.max(88, labelWidth + labelHeight + 32);
     return { elementWidth: diamondSize, elementHeight: diamondSize, labelWidth, visualWidth: diamondSize, visualHeight: diamondSize };
+  }
+  const fixedMetrics = {
+    "class-box": [180, 112],
+    "class-interface": [180, 112],
+    "class-enum": [180, 112],
+    "class-package": [170, 90],
+    state: [190, 96],
+    actor: [80, 90],
+    usecase: [180, 76],
+    boundary: [330, 240],
+    "sequence-actor": [80, 90],
+    "sequence-object": [170, 58],
+    "sequence-activation": [14, 72],
+    "sequence-fragment": [240, 120],
+    "pap-decision-table": [260, 150]
+  }[piece.kind];
+  if (fixedMetrics) {
+    const [elementWidth, elementHeight] = fixedMetrics;
+    return { elementWidth, elementHeight, labelWidth: Math.max(54, elementWidth - 28), visualWidth: elementWidth, visualHeight: elementHeight };
   }
   const charactersPerLine = 42;
   const lineCount = Math.max(1, logicalLines.reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / charactersPerLine)), 0));
@@ -2881,7 +2937,7 @@ function renderDiagramBuilderPalette(session) {
   session.pieces.forEach((piece, index) => {
     const button = createElement("button", `diagram-builder-palette-item ${piece.kind}`);
     button.type = "button";
-    if (piece.kind === "activity-action" || piece.kind === "activity-decision") {
+    if (!["activity-swimlane", "actor", "sequence-actor", "sequence-activation"].includes(piece.kind)) {
       applyDiagramBuilderPieceMetrics(button, { ...piece, label: piece.paletteLabel });
     }
     button.append(createElement("span", "diagram-builder-piece-label", piece.paletteLabel));
@@ -3054,6 +3110,10 @@ function diagramBuilderAutomaticSourceSides(session) {
     if (!source || !target) return;
     const horizontalDistance = (target.column - source.column) * session.cellWidth;
     const verticalDistance = (target.row - source.row) * session.cellHeight;
+    if (session.viewType === "sequence") {
+      sides.set(connection.id, horizontalDistance < 0 ? "left" : "right");
+      return;
+    }
     if (Math.abs(horizontalDistance) >= Math.abs(verticalDistance)) {
       sides.set(connection.id, horizontalDistance < 0 ? "left" : "right");
     } else {
@@ -3192,10 +3252,16 @@ function openDiagramBuilderEndpointMenu(session, connection, endpoint, clientX, 
   menu.style.top = `${Math.max(55, Math.min(window.innerHeight - 150, clientY))}px`;
   menu.append(createElement("strong", "", `Pfeilspitze am ${endpoint === "start" ? "Anfang" : "Ende"}`));
   const property = endpoint === "start" ? "startMarker" : "endMarker";
-  [
+  const markerOptions = [
     ["none", "Keine"],
     ["control", "Kontrollflussspitze"]
-  ].forEach(([value, label]) => {
+  ];
+  if (session.viewType === "class") markerOptions.push(
+    ["inheritance", "Vererbung"],
+    ["aggregation", "Aggregation"],
+    ["composition", "Komposition"]
+  );
+  markerOptions.forEach(([value, label]) => {
     const button = createElement("button", connection[property] === value ? "selected" : "", label);
     button.type = "button";
     button.addEventListener("click", (event) => {
@@ -3336,6 +3402,37 @@ function drawDiagramBuilderConnections(session) {
   });
   marker.append(createSvgElement("path", { d: "M 0 0 L 8 4 L 0 8 z", fill: "context-stroke" }));
   definitions.append(marker);
+  const inheritanceMarker = createSvgElement("marker", {
+    id: "diagram-builder-inheritance",
+    markerWidth: 12,
+    markerHeight: 12,
+    refX: 10,
+    refY: 6,
+    orient: "auto-start-reverse",
+    markerUnits: "strokeWidth"
+  });
+  inheritanceMarker.append(createSvgElement("path", { d: "M 1 1 L 11 6 L 1 11 z", fill: "#0a0810", stroke: "context-stroke", "stroke-width": 1.4 }));
+  const aggregationMarker = createSvgElement("marker", {
+    id: "diagram-builder-aggregation",
+    markerWidth: 14,
+    markerHeight: 10,
+    refX: 13,
+    refY: 5,
+    orient: "auto-start-reverse",
+    markerUnits: "strokeWidth"
+  });
+  aggregationMarker.append(createSvgElement("path", { d: "M 1 5 L 7 1 L 13 5 L 7 9 z", fill: "#0a0810", stroke: "context-stroke", "stroke-width": 1.2 }));
+  const compositionMarker = createSvgElement("marker", {
+    id: "diagram-builder-composition",
+    markerWidth: 14,
+    markerHeight: 10,
+    refX: 13,
+    refY: 5,
+    orient: "auto-start-reverse",
+    markerUnits: "strokeWidth"
+  });
+  compositionMarker.append(createSvgElement("path", { d: "M 1 5 L 7 1 L 13 5 L 7 9 z", fill: "context-stroke" }));
+  definitions.append(inheritanceMarker, aggregationMarker, compositionMarker);
   layer.append(definitions);
 
   const surfaceRect = session.surface.getBoundingClientRect();
@@ -3378,7 +3475,7 @@ function drawDiagramBuilderConnections(session) {
       top: (targetRect.top - surfaceRect.top) / zoom,
       bottom: (targetRect.bottom - surfaceRect.top) / zoom
     };
-    const sourcePort = diagramBuilderPortOnBox(sourceBox, sourceSide, fraction, source.piece.kind === "activity-decision");
+    const sourcePort = diagramBuilderPortOnBox(sourceBox, sourceSide, fraction, diagramBuilderIsDiamond(source.piece));
     const sourceBoundary = sourceSide === "left" || sourceSide === "right"
       ? { x: (source.column + (sourceSide === "right" ? 1 : 0)) * session.cellWidth, y: sourcePort.y }
       : { x: sourcePort.x, y: (source.row + (sourceSide === "bottom" ? 1 : 0)) * session.cellHeight };
@@ -3395,7 +3492,7 @@ function drawDiagramBuilderConnections(session) {
     for (let lane = 1; lane <= Math.max(8, session.connections.length); lane += 1) laneOffsets.push(-lane * 5, lane * 5);
     targetSides.forEach((targetSide, targetSideIndex) => {
       const targetFraction = targetPortAssignments.get(connection.id) || 0.5;
-      const targetPort = diagramBuilderPortOnBox(targetBox, targetSide, targetFraction, target.piece.kind === "activity-decision");
+      const targetPort = diagramBuilderPortOnBox(targetBox, targetSide, targetFraction, diagramBuilderIsDiamond(target.piece));
       const targetBoundary = targetSide === "left" || targetSide === "right"
         ? { x: (target.column + (targetSide === "right" ? 1 : 0)) * session.cellWidth, y: targetPort.y }
         : { x: targetPort.x, y: (target.row + (targetSide === "bottom" ? 1 : 0)) * session.cellHeight };
@@ -3480,8 +3577,16 @@ function drawDiagramBuilderConnections(session) {
       class: "diagram-builder-connector editable",
       d: pathData
     };
-    if ((connection.startMarker || "none") === "control") pathAttributes["marker-start"] = "url(#diagram-builder-arrowhead)";
-    if ((connection.endMarker || "control") === "control") pathAttributes["marker-end"] = "url(#diagram-builder-arrowhead)";
+    const markerUrl = (markerType) => ({
+      control: "url(#diagram-builder-arrowhead)",
+      inheritance: "url(#diagram-builder-inheritance)",
+      aggregation: "url(#diagram-builder-aggregation)",
+      composition: "url(#diagram-builder-composition)"
+    })[markerType];
+    const startMarkerUrl = markerUrl(connection.startMarker || "none");
+    const endMarkerUrl = markerUrl(connection.endMarker || "control");
+    if (startMarkerUrl) pathAttributes["marker-start"] = startMarkerUrl;
+    if (endMarkerUrl) pathAttributes["marker-end"] = endMarkerUrl;
     const connectionGroup = createSvgElement("g", {
       class: "diagram-builder-connection-group",
       "data-connection-id": connection.id
@@ -3572,13 +3677,16 @@ function createDiagramBuilderPlacedNode(session, placement) {
     top: centerY - pieceMetrics.elementHeight / 2,
     bottom: centerY + pieceMetrics.elementHeight / 2
   };
-  const isDiamond = placement.piece.kind === "activity-decision";
-  [
+  const isDiamond = diagramBuilderIsDiamond(placement.piece);
+  const connectionHandleSides = session.viewType === "sequence"
+    ? (placement.piece.kind === "sequence-activation" ? [["right", "→"], ["left", "←"]] : [])
+    : [
     ["top", "↑"],
     ["right", "→"],
     ["bottom", "↓"],
     ["left", "←"]
-  ].forEach(([side, icon]) => {
+  ];
+  connectionHandleSides.forEach(([side, icon]) => {
     const fraction = 0.5;
     const port = diagramBuilderPortOnBox(handleBox, side, fraction, isDiamond);
     const left = port.x + (side === "left" ? -8 : side === "right" ? 8 : 0);
@@ -3866,7 +3974,7 @@ function findFreeDiagramBuilderCell(session) {
 }
 
 function renderDiagramBuilderWorkspace(session) {
-  session.pieces = createDiagramBuilderPieces(session.file);
+  session.pieces = createDiagramBuilderPieces(session.file, session.viewType);
   updateDiagramBuilderGridMetrics(session);
   session.connectorLayer = createSvgElement("svg", { class: "diagram-builder-connectors", "aria-hidden": "true" });
   session.surface.replaceChildren(session.connectorLayer, session.emptyHint);
@@ -3880,6 +3988,37 @@ function renderDiagramBuilderWorkspace(session) {
     if (placement.id === session.selectedPlacementId) cell.querySelector(".diagram-builder-piece").classList.add("selected");
   });
   window.requestAnimationFrame(() => drawDiagramBuilderConnections(session));
+}
+
+function switchDiagramBuilderView(session, nextViewType) {
+  if (nextViewType === session.viewType) return;
+  session.finishEditing?.(true);
+  session.finishConnectionEditing?.(true);
+  session.finishSwimlaneEditing?.(true);
+  clearDiagramBuilderPlacementMode(session);
+  clearDiagramBuilderConnectionMode(session);
+  session.diagramStates.set(session.viewType, {
+    placements: session.placements,
+    swimlanes: session.swimlanes,
+    connections: session.connections,
+    nextPlacementId: session.nextPlacementId,
+    nextSwimlaneId: session.nextSwimlaneId,
+    nextConnectionId: session.nextConnectionId
+  });
+  const stored = session.diagramStates.get(nextViewType);
+  session.viewType = nextViewType;
+  session.placements = stored?.placements || [];
+  session.swimlanes = stored?.swimlanes || [];
+  session.connections = stored?.connections || [];
+  session.nextPlacementId = stored?.nextPlacementId || 0;
+  session.nextSwimlaneId = stored?.nextSwimlaneId || 0;
+  session.nextConnectionId = stored?.nextConnectionId || 0;
+  session.selectedPlacementId = null;
+  session.selectedSwimlaneId = null;
+  session.editingConnectionId = null;
+  renderDiagramBuilderWorkspace(session);
+  session.palette.scrollLeft = 0;
+  setDiagramBuilderStatus(session, `${UML_VIEWS[nextViewType]} ausgewählt. Baustein halten und ins Raster ziehen.`, "success");
 }
 
 function enableDiagramBuilderPaneZoom(session, viewport, content, zoomProperty, afterZoom = null) {
@@ -3957,7 +4096,9 @@ function openDiagramBuilderMode(file) {
   const selectorLabel = createElement("label", "diagram-builder-selector");
   selectorLabel.append(createElement("span", "", "Diagrammart"));
   const selector = document.createElement("select");
-  selector.append(new Option(UML_VIEWS.activity, "activity"));
+  ["class", "state", "usecase", "activity", "sequence", "pap"].forEach((viewType) => {
+    selector.append(new Option(UML_VIEWS[viewType], viewType, false, viewType === "activity"));
+  });
   selectorLabel.append(selector);
   header.append(backButton, title, selectorLabel);
 
@@ -4010,6 +4151,7 @@ function openDiagramBuilderMode(file) {
     codeList,
     codeLines,
     viewType: "activity",
+    diagramStates: new Map(),
     pieces: [],
     placements: [],
     swimlanes: [],
@@ -4128,6 +4270,7 @@ function openDiagramBuilderMode(file) {
   });
   toastCancelButton.addEventListener("click", () => cancelDiagramBuilderDeletion(session));
   toastDeleteButton.addEventListener("click", () => confirmDiagramBuilderDeletion(session));
+  selector.addEventListener("change", () => switchDiagramBuilderView(session, selector.value));
   backButton.addEventListener("click", closeDiagramBuilderMode);
   session.handleKeyDown = (event) => {
     if (!session.toast.hidden) {
