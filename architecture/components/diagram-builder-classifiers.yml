@@ -1,0 +1,9 @@
+id: diagram-builder.classifier-editing
+type: component
+path: public/app.js
+symbol: beginDiagramBuilderClassifierEdit
+what: 'Bearbeitet Klassen, abstrakte Klassen, Interfaces und Enumerationen mit typgerechten Bereichen und sortierbaren Einträgen.'
+why: 'Die UML-Typen teilen eine Grundform, benötigen aber unterschiedliche Inhalte; eine gemeinsame Bearbeitung vermeidet abweichende Bedienmuster.'
+depends_on:
+  - diagram-builder.workspace
+  - diagram-builder.element-catalog

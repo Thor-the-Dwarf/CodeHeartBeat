@@ -1,0 +1,9 @@
+id: diagram-builder.connection-routing
+type: component
+path: public/app.js
+symbol: drawDiagramBuilderConnections
+what: 'Berechnet Ports, orthogonale Rasterpfade, Abstände, Beschriftungen und Bearbeitungspositionen für Diagrammverbindungen.'
+why: 'Pfeile sollen sich automatisch an verschobene Elemente anpassen, Linien möglichst nicht überlagern und diagrammspezifische Regeln einhalten.'
+depends_on:
+  - diagram-builder.workspace
+  - diagram-builder.element-catalog

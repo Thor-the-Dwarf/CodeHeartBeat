@@ -1,0 +1,9 @@
+id: compile.simulation
+type: subsystem
+path: public/app.js
+symbol: analyzeCompilation
+what: 'Visualisiert eine didaktisch vereinfachte Kompilierungsphase und den schrittweisen Aufbau des Klassenmodells.'
+why: 'Die getrennte Darstellung von Compile- und Laufzeit unterstützt das Verständnis dafür, welche Informationen bereits vor der Ausführung feststehen.'
+depends_on:
+  - java.source-analysis
+  - uml.viewer

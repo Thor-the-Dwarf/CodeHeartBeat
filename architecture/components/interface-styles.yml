@@ -1,0 +1,7 @@
+id: application.interface-styles
+type: stylesheet
+path: public/styles.css
+what: 'Enthält das Darkmode-Erscheinungsbild, Layouts, Diagrammsymbole, Interaktionszustände, Animationen und responsive Regeln der Anwendung.'
+why: 'Eine statische Stylesheet-Ressource hält den direkten HTML-Start einfach; die fachliche Aufteilung ist als nächster Refactoring-Schritt vorgesehen.'
+depends_on:
+  - application.client-controller

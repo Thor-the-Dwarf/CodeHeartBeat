@@ -27,6 +27,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Architekturkatalog prüfen
+        run: npm run check:architecture
+
       - name: FolderTree für die statische Website erzeugen
         run: npm run build:data
 

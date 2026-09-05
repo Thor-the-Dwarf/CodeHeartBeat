@@ -1,0 +1,9 @@
+id: folder-tree.synchronized-navigation
+type: component
+path: public/app.js
+symbol: selectFileInBothTrees
+what: 'Synchronisiert geöffnete Ordner und ausgewählte Dateien zwischen dem seitlichen FolderTree und der Architekturansicht.'
+why: 'Beide Navigationsdarstellungen sollen denselben Projektzustand zeigen und dürfen bei einer Auswahl nicht auseinanderlaufen.'
+depends_on:
+  - folder-tree.generated-data
+  - application.client-controller

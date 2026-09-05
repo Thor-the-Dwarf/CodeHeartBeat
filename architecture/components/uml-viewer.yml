@@ -1,0 +1,8 @@
+id: uml.viewer
+type: subsystem
+path: public/app.js
+symbol: renderUmlView
+what: 'Erzeugt aus dem analysierten Java-Modell die auswählbaren Klassen-, Zustands-, Use-Case-, Aktivitäts-, Sequenz-, Nassi-Shneiderman-, PAP- und Pseudocodeansichten.'
+why: 'Alle Ansichten verwenden dieselbe Quellcodeanalyse, damit Diagrammwechsel den dargestellten Programmstand nicht verändern.'
+depends_on:
+  - java.source-analysis

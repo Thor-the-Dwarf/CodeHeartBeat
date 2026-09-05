@@ -1,0 +1,7 @@
+id: folder-tree.data-generator
+type: generator
+path: scripts/generate-folder-data.js
+what: 'Liest den lokalen FolderTree ein und erzeugt daraus die statische Browser-Datenquelle.'
+why: 'Browser dürfen beim direkten Start keine lokalen Verzeichnisse frei einlesen; die vorab erzeugte Datei erhält trotzdem den serverlosen Startweg.'
+depends_on:
+  - folder-tree.java-source

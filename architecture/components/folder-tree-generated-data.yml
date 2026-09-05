@@ -1,0 +1,7 @@
+id: folder-tree.generated-data
+type: generated-data
+path: public/folder-data.js
+what: 'Stellt den Inhalt des Java-FolderTrees als direkt ladbare JavaScript-Datenstruktur für die statische Website bereit.'
+why: 'Die Datei überbrückt den fehlenden Dateisystemzugriff im Browser und wird deshalb aus den Java-Quelldateien erzeugt statt von Hand gepflegt.'
+depends_on:
+  - folder-tree.data-generator

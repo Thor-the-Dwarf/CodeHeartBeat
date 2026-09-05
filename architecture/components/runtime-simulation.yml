@@ -1,0 +1,9 @@
+id: runtime.simulation
+type: subsystem
+path: public/app.js
+symbol: transpileJavaMain
+what: 'Simuliert die Ausführung geeigneter Java-Main-Methoden, Terminalausgaben und den synchronen Laufzeitpunkt in Code und Diagramm.'
+why: 'Die browserbasierte Simulation macht Kontrollfluss sichtbar, obwohl die statische Website keine echte lokale JVM starten kann.'
+depends_on:
+  - java.source-analysis
+  - uml.viewer

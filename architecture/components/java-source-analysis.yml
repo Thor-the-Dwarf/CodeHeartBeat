@@ -1,0 +1,8 @@
+id: java.source-analysis
+type: component
+path: public/app.js
+symbol: analyzeUmlModel
+what: 'Analysiert Java-Quelltext für Deklarationen, Klassenmodelle, Kontrollfluss, Diagramme und Laufzeitsimulationen.'
+why: 'Eine gemeinsame clientseitige Analyse hält Codeansicht, UML-Darstellung und Simulation synchron, ohne einen Java-Parserdienst vorauszusetzen.'
+depends_on:
+  - folder-tree.generated-data

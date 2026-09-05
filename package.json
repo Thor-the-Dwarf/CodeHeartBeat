@@ -4,6 +4,7 @@
   "private": true,
   "description": "Lokale Code-Visualisierung mit dynamischem FolderTree",
   "scripts": {
+    "check:architecture": "node scripts/validate-architecture.js",
     "build:data": "node scripts/generate-folder-data.js",
     "start": "node server.js"
   }

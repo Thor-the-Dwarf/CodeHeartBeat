@@ -1,0 +1,10 @@
+id: diagram-builder.workspace
+type: subsystem
+path: public/app.js
+symbol: openDiagramBuilderMode
+what: 'Öffnet den Zeichenmodus mit Quellcode, Diagrammauswahl, Bausteinleiste, Rasterfläche und getrenntem Zoomverhalten.'
+why: 'Der Vollbild-Arbeitsbereich erlaubt die manuelle Übertragung des Codes in unterschiedliche Diagrammarten, ohne den Dateikontext zu verlieren.'
+depends_on:
+  - java.source-analysis
+  - diagram-builder.element-catalog
+  - diagram-builder.connection-routing

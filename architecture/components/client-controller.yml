@@ -1,0 +1,9 @@
+id: application.client-controller
+type: subsystem
+path: public/app.js
+symbol: renderApplication
+what: 'Steuert die Benutzeroberfläche, Dateiauswahl, Visualisierungen, Simulationen und interaktiven Lernmodi im Browser.'
+why: 'Die gesamte Laufzeitlogik liegt im Client, damit weder der direkte HTML-Start noch GitHub Pages einen Anwendungsserver benötigen.'
+depends_on:
+  - folder-tree.generated-data
+  - java.source-analysis

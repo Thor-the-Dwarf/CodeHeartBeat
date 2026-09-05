@@ -1,0 +1,10 @@
+id: diagram-builder.sequence-elements
+type: component
+path: public/app.js
+symbol: beginDiagramBuilderSequenceParticipantEdit
+what: 'Steuert Lebenslinien, Aktivitätsbalken, Selbstbeziehungen und kombinierte Fragmente des Sequenzdiagramm-Editors.'
+why: 'Diese Elemente folgen zeitlichen und geometrischen Sonderregeln, die nicht mit dem allgemeinen Rasterverhalten gleichgesetzt werden dürfen.'
+depends_on:
+  - diagram-builder.workspace
+  - diagram-builder.containers
+  - diagram-builder.connection-routing

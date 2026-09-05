@@ -1,0 +1,10 @@
+id: file.workspace
+type: component
+path: public/app.js
+symbol: createFileNode
+what: 'Erzeugt für eine Java-Datei Kopfzeile, Codeansicht, Diagrammbereich, Laufzeitaktionen und die drei Darstellungsgrößen.'
+why: 'Alle dateibezogenen Lernwerkzeuge bleiben in einer gemeinsamen, einzeln zoombaren Arbeitsfläche zusammengefasst.'
+depends_on:
+  - code.syntax-highlighting
+  - uml.viewer
+  - runtime.simulation

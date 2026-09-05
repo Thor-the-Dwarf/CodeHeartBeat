@@ -1,0 +1,8 @@
+id: code.syntax-highlighting
+type: component
+path: public/app.js
+symbol: highlightJavaLine
+what: 'Zerlegt Java-Quelltext zeilenweise in darstellbare Syntaxbestandteile und versieht sie mit IntelliJ-nahen Farbklassen.'
+why: 'Eine kleine lokale Hervorhebung funktioniert beim direkten HTML-Start ohne Editorbibliothek, Netzwerkzugriff oder Buildschritt.'
+depends_on:
+  - folder-tree.generated-data

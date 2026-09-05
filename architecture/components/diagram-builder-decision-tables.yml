@@ -1,0 +1,9 @@
+id: diagram-builder.decision-tables
+type: component
+path: public/app.js
+symbol: beginDiagramBuilderDecisionTableEdit
+what: 'Bearbeitet PAP-Entscheidungstabellen mit Bedingungen, Aktionen, mindestens drei Regeln und zeilengebundenen Pfeilausgängen.'
+why: 'Die Tabellen ersetzen die enthaltenen Entscheidungszweige und bilden prüfungsrelevante Regelkombinationen ohne doppelte PAP-Ausführung ab.'
+depends_on:
+  - diagram-builder.workspace
+  - diagram-builder.connection-routing

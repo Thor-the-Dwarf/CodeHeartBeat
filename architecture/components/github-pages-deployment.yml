@@ -1,0 +1,8 @@
+id: deployment.github-pages
+type: deployment
+path: .github/workflows/pages.yml
+what: 'Erzeugt bei Änderungen auf main die FolderTree-Daten und veröffentlicht den Inhalt von public auf GitHub Pages.'
+why: 'Der automatisierte Workflow hält die mobile Vorschau aktuell und bewahrt gleichzeitig die vollständig statische Auslieferung.'
+depends_on:
+  - application.static-delivery
+  - folder-tree.data-generator

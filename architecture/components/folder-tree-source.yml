@@ -1,0 +1,6 @@
+id: folder-tree.java-source
+type: data-source
+path: FolderTree
+what: 'Enthält die Java-Lern- und Anschauungsdateien, die in beiden FolderTrees und den Visualisierungen angezeigt werden.'
+why: 'Echte Java-Dateien bleiben dadurch unabhängig von der Oberfläche lesbar, ausführbar und als Unterrichtsmaterial nutzbar.'
+depends_on: []

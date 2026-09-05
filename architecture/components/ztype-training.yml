@@ -1,0 +1,8 @@
+id: learning.ztype-training
+type: subsystem
+path: public/app.js
+symbol: openZTypeMode
+what: 'Bietet ein bildschirmfüllendes Tipptraining, bei dem Java-Code zeilenweise auf das Raumschiff zufällt und durch korrekte Eingaben sichtbar wird.'
+why: 'Der spielerische Modus verbindet Syntaxwiederholung mit Tastaturtraining und bleibt vollständig im statischen Client ausführbar.'
+depends_on:
+  - java.source-analysis

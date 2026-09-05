@@ -1,0 +1,8 @@
+id: application.static-delivery
+type: subsystem
+path: public/index.html
+what: 'Startet CodeHeartBeat als vollständig statische Webanwendung und bindet alle auslieferbaren Ressourcen ein.'
+why: 'Die Anwendung muss direkt über die index.html gestartet und gleichzeitig unverändert auf GitHub Pages bereitgestellt werden können.'
+depends_on:
+  - folder-tree.generated-data
+  - application.client-controller

@@ -24,6 +24,21 @@ Danach ist die Anwendung unter <http://127.0.0.1:4173> erreichbar.
 
 Der Server ist für die normale Dateiauswahl nicht erforderlich.
 
+## Architektur und Zusammenarbeit
+
+Der Ordner `architecture/` dokumentiert wichtige Projektbestandteile in einzelnen YAML-Dateien. Jeder Eintrag besitzt eine stabile ID und beantwortet kurz:
+
+- `what`: Was ist der Bestandteil und was leistet er?
+- `why`: Warum wurde diese Lösung gewählt?
+
+Vor Änderungen an zentralen Komponenten sollten Mitarbeitende und Agenten zuerst `architecture/agent_rules.md` sowie die betroffenen Einträge unter `architecture/components/` lesen. Der Katalog wird geprüft mit:
+
+```bash
+npm run check:architecture
+```
+
+Der Katalog enthält bewusst nur wichtige Bestandteile und keine einzelnen trivialen Variablen. Es wird keine SQL- oder SQLite-Datenbank daraus erzeugt. Git bleibt die einzige Commit-Historie.
+
 ## Vom Handy aus weiterarbeiten
 
 Repository: <https://github.com/Thor-the-Dwarf/CodeHeartBeat>
@@ -35,8 +50,9 @@ Die ChatGPT-App kann mit dem verbundenen GitHub-Repository arbeiten. Als Ziel so
 Nach jedem Push auf `main` führt GitHub Actions automatisch folgende Schritte aus:
 
 1. Der aktuelle Repository-Stand wird geladen.
-2. Aus `FolderTree/` wird `public/folder-data.js` neu erzeugt.
-3. Der Inhalt von `public/` wird auf GitHub Pages veröffentlicht.
+2. Der YAML-Architekturkatalog wird geprüft.
+3. Aus `FolderTree/` wird `public/folder-data.js` neu erzeugt.
+4. Der Inhalt von `public/` wird auf GitHub Pages veröffentlicht.
 
 Dadurch genügt es bei neuen oder geänderten Java-Beispielen, die Dateien unter `FolderTree/` zu bearbeiten. Die generierte Datei `public/folder-data.js` muss in mobilen Sitzungen nicht von Hand aktualisiert werden.
 

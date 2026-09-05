@@ -1,0 +1,8 @@
+id: diagram-builder.containers
+type: component
+path: public/app.js
+symbol: createDiagramBuilderContainerMoveHandle
+what: 'Vereinheitlicht Verschieben, Größenänderung, Rastereinrasten und Löschen für Swimlanes, Systemgrenzen und kombinierte Fragmente.'
+why: 'Alle Container sollen sich trotz unterschiedlicher Diagrammsemantik gleichartig bedienen lassen und beim Löschen denselben sicheren Bestätigungsweg verwenden.'
+depends_on:
+  - diagram-builder.workspace

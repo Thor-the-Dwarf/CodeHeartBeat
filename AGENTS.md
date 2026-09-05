@@ -10,6 +10,13 @@ CodeHeartBeat ist eine vollständig statische Lern- und Visualisierungsanwendung
 - `FolderTree/`: Java-Lernbeispiele, die in der Anwendung angezeigt werden
 - `scripts/generate-folder-data.js`: erzeugt aus `FolderTree/` die statische Datei `public/folder-data.js`
 - `.github/workflows/pages.yml`: baut und veröffentlicht `public/` auf GitHub Pages
+- `architecture/`: Git-freundlicher YAML-Katalog wichtiger Komponenten mit What-/Why-Erklärungen
+
+## Architekturwissen für Agenten
+
+- Vor Änderungen an zentralen Komponenten `architecture/agent_rules.md` und die passenden Dateien unter `architecture/components/` lesen.
+- Architektur-YAML und Code müssen im selben Commit aktualisiert werden, wenn sich Verantwortung, Pfad, Abhängigkeiten oder Begründung einer katalogisierten Komponente ändern.
+- Keine Datenbank oder zweite Commit-Historie aus dem Katalog erzeugen. Die YAML-Dateien sind die Wissensquelle, Git ist die Änderungshistorie.
 
 ## Regeln für Änderungen
 
@@ -24,6 +31,7 @@ CodeHeartBeat ist eine vollständig statische Lern- und Visualisierungsanwendung
 
 ```bash
 npm run build:data
+npm run check:architecture
 node --check public/app.js
 node --check scripts/generate-folder-data.js
 node --check server.js

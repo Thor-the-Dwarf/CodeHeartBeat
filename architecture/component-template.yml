@@ -1,0 +1,8 @@
+id: example.component-name
+type: component
+path: public/example.js
+symbol: exampleFunction
+what: 'Beschreibt kurz die Verantwortung des Bestandteils.'
+why: 'Erklärt die nicht offensichtliche technische oder fachliche Entscheidung.'
+depends_on:
+  - example.other-component

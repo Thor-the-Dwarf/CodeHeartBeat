@@ -1,0 +1,8 @@
+id: diagram-builder.element-catalog
+type: component
+path: public/app.js
+symbol: createDiagramBuilderPieces
+what: 'Definiert die pro Diagrammart verfügbaren Standardformen, deren Startwerte und die kurzen didaktischen Tooltips.'
+why: 'Diagrammspezifische Kataloge verhindern unzulässige UML-Elemente und halten Auswahlleiste und Platzierungslogik konsistent.'
+depends_on:
+  - diagram-builder.workspace
