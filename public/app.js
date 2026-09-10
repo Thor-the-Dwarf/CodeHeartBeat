@@ -6316,7 +6316,7 @@ function createDiagramBuilderSwimlaneNode(session, swimlane) {
     const editor = createElement("input", "diagram-builder-swimlane-label-editor");
     editor.type = "text";
     editor.value = swimlane.label;
-    editor.placeholder = "Bezeichnung (optional)";
+    editor.placeholder = "Bezeichnung";
     editor.setAttribute("aria-label", "Bezeichnung der Swimlane bearbeiten");
     editor.addEventListener("blur", () => {
       window.setTimeout(() => {
