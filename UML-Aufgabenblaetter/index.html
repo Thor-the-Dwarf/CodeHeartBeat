@@ -243,18 +243,6 @@
     .tool:active { cursor: grabbing; }
     .tool:hover .shape { filter: drop-shadow(0 0 9px rgba(199, 125, 255, 0.42)); }
 
-    .tool::after {
-      position: absolute;
-      top: calc(50% + 34px);
-      left: 50%;
-      color: #cec4d7;
-      content: attr(data-name);
-      font-size: 8px;
-      font-weight: 800;
-      white-space: nowrap;
-      transform: translateX(-50%);
-    }
-
     .tool[data-tooltip]:hover::before {
       position: fixed;
       z-index: 80;
@@ -289,7 +277,8 @@
     }
 
     .shape.start,
-    .shape.end {
+    .shape.end,
+    .shape.flow-final {
       width: 40px;
       height: 40px;
       border-radius: 50%;
@@ -300,6 +289,25 @@
     .shape.end {
       border: 5px double #dce7f2;
       background: #080c12;
+    }
+
+    .shape.start > span,
+    .shape.end > span,
+    .shape.flow-final > span,
+    .shape.fork > span,
+    .shape.join > span {
+      position: absolute;
+      top: calc(100% + 12px);
+      left: 50%;
+      width: max-content;
+      color: #cec4d7;
+      transform: translateX(-50%);
+    }
+
+    .shape.object {
+      border-radius: 0;
+      border-color: #8fb0c8;
+      background: #15212c;
     }
 
     .shape.decision,
@@ -314,7 +322,11 @@
     }
 
     .shape.decision > span,
-    .shape.merge > span { transform: rotate(-45deg); }
+    .shape.merge > span {
+      font-size: 8px;
+      white-space: nowrap;
+      transform: rotate(-45deg);
+    }
 
     .shape.fork,
     .shape.join {
@@ -325,6 +337,119 @@
       background: #c9d4e3;
       color: transparent;
     }
+
+    .shape.flow-final {
+      border: 2px solid #dce7f2;
+      color: transparent;
+      background: transparent;
+    }
+
+    .shape.flow-final::before,
+    .shape.flow-final::after {
+      position: absolute;
+      width: 24px;
+      height: 2px;
+      content: "";
+      background: #dce7f2;
+      transform: rotate(45deg);
+    }
+
+    .shape.flow-final::after { transform: rotate(-45deg); }
+
+    .shape.swimlane {
+      width: 154px;
+      height: 82px;
+      padding-top: 10px;
+      border-radius: 0;
+      border-color: #aeb8c8;
+      color: #dce7f2;
+      background: rgba(14, 18, 26, 0.35);
+    }
+
+    .shape.swimlane::after {
+      position: absolute;
+      top: 30px;
+      right: 0;
+      left: 0;
+      border-top: 1px solid #aeb8c8;
+      content: "";
+    }
+
+    .swimlane-container {
+      position: absolute;
+      z-index: 1;
+      top: 0;
+      bottom: 0;
+      min-width: 180px;
+      border-right: 2px solid rgba(184, 196, 214, 0.62);
+      border-left: 2px solid rgba(184, 196, 214, 0.62);
+      background: rgba(39, 31, 49, 0.12);
+    }
+
+    .swimlane-container:hover,
+    .swimlane-container.selected {
+      border-color: #c77dff;
+      background: rgba(94, 53, 116, 0.08);
+    }
+
+    .swimlane-label,
+    .swimlane-editor {
+      position: absolute;
+      z-index: 2;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 34px;
+      padding: 5px 38px 5px 9px;
+      border: 0;
+      border-bottom: 1px solid rgba(184, 196, 214, 0.52);
+      border-radius: 0;
+      color: #e9e0ef;
+      background: rgba(18, 14, 24, 0.9);
+      font: 700 9px/1.2 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+      text-align: center;
+    }
+
+    .swimlane-label { cursor: text; }
+    .swimlane-editor:focus { outline: 1px solid #c77dff; outline-offset: -1px; }
+
+    .swimlane-move {
+      position: absolute;
+      z-index: 5;
+      top: 5px;
+      right: 6px;
+      width: 26px;
+      height: 24px;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      color: #cfc5d8;
+      background: transparent;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .swimlane-move:hover,
+    .swimlane-move:focus-visible { border-color: #c77dff; color: #fff; outline: none; }
+
+    .swimlane-boundary {
+      position: absolute;
+      z-index: 4;
+      top: 0;
+      bottom: 0;
+      width: 14px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      cursor: ew-resize;
+      touch-action: none;
+    }
+
+    .swimlane-boundary.left { left: 0; transform: translateX(-50%); }
+    .swimlane-boundary.right { right: 0; transform: translateX(50%); }
+    .swimlane-boundary:hover,
+    .swimlane-boundary:focus-visible { background: rgba(199, 125, 255, 0.42); outline: none; }
 
     .canvas-viewport {
       position: relative;
@@ -352,7 +477,7 @@
       transform-origin: 0 0;
     }
 
-    .surface.connecting { cursor: crosshair; }
+    .surface.connecting { cursor: default; }
 
     .empty-state {
       position: absolute;
@@ -388,11 +513,21 @@
       pointer-events: none;
     }
 
+    .connection-preview {
+      fill: none;
+      stroke: var(--purple);
+      stroke-width: 2.4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: none;
+      filter: drop-shadow(0 0 5px rgba(199, 125, 255, 0.55));
+    }
+
     .connection-hit {
       fill: none;
       stroke: rgba(0, 0, 0, 0.001);
       stroke-width: 16;
-      cursor: text;
+      cursor: grab;
       pointer-events: stroke;
     }
 
@@ -439,7 +574,8 @@
       border: 1px solid transparent;
       border-radius: 999px;
       background: transparent;
-      cursor: text;
+      cursor: grab;
+      touch-action: none;
       transform: translate(-50%, -50%);
     }
 
@@ -448,6 +584,35 @@
       border-color: rgba(88, 223, 247, 0.34);
       outline: none;
       background: rgba(88, 223, 247, 0.05);
+    }
+
+    .edge-handle.dragging {
+      cursor: grabbing;
+      border-color: var(--purple);
+      background: rgba(199, 125, 255, 0.12);
+    }
+
+    .edge-drag-ghost {
+      position: fixed;
+      z-index: 80;
+      width: 58px;
+      height: 18px;
+      border-top: 2px solid var(--line);
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      filter: drop-shadow(0 0 5px rgba(88, 223, 247, 0.55));
+    }
+
+    .edge-drag-ghost::after {
+      position: absolute;
+      top: -6px;
+      right: -1px;
+      width: 9px;
+      height: 9px;
+      border-top: 2px solid var(--line);
+      border-right: 2px solid var(--line);
+      content: "";
+      transform: rotate(45deg);
     }
 
     .node {
@@ -487,6 +652,18 @@
       transform: none !important;
     }
 
+    .shape.start .node-editor,
+    .shape.end .node-editor,
+    .shape.flow-final .node-editor,
+    .shape.fork .node-editor,
+    .shape.join .node-editor {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 50%;
+      color: #fff;
+      transform: translateX(-50%) !important;
+    }
+
     .port {
       position: absolute;
       z-index: 8;
@@ -512,6 +689,10 @@
     .port.right { top: 50%; right: -18px; margin-top: -12px; }
     .port.bottom { bottom: -18px; left: 50%; margin-left: -12px; transform: rotate(90deg); }
     .port.left { top: 50%; left: -18px; margin-top: -12px; transform: rotate(180deg); }
+    .node:has(.shape.fork) .port.top,
+    .node:has(.shape.join) .port.top { top: -30px; }
+    .node:has(.shape.fork) .port.bottom,
+    .node:has(.shape.join) .port.bottom { bottom: -30px; }
     .port.top:hover { transform: rotate(-90deg) scale(1.15); }
     .port.bottom:hover { transform: rotate(90deg) scale(1.15); }
     .port.left:hover { transform: rotate(180deg) scale(1.15); }
@@ -626,6 +807,7 @@
             <ul>
               <li>Baustein oben halten und in das Raster ziehen.</li>
               <li>Elemente durch Ziehen neu positionieren.</li>
+              <li>Elemente oder Pfeile halten und in die rote Löschfläche ziehen.</li>
               <li>Beschriftungen durch Doppelklick bearbeiten.</li>
               <li>Am Rand eines Elements einen Anschluss wählen und danach das Zielelement anklicken.</li>
               <li>Pfeilbeschriftungen durch Doppelklick bearbeiten.</li>
@@ -669,25 +851,31 @@
       const SURFACE_WIDTH = 1620;
       const SURFACE_HEIGHT = 1300;
       const STORAGE_KEY = "codeheartbeat-uml-worksheet-activity-v1";
-      const EDITABLE_TYPES = new Set(["action", "decision", "merge"]);
+      const EDITABLE_TYPES = new Set(["start", "action", "object", "decision", "merge", "fork", "join", "flow-final", "end"]);
       const tools = [
-        { type: "start", name: "Start", label: "", tooltip: "Beginn des dargestellten Ablaufs." },
-        { type: "action", name: "Aktion", label: "Aktion", tooltip: "Ein einzelner Verarbeitungsschritt oder eine Tätigkeit." },
-        { type: "decision", name: "Entscheidung", label: "Bedingung", tooltip: "Verzweigt den Kontrollfluss anhand einer Bedingung." },
-        { type: "merge", name: "Zusammenführung", label: "", tooltip: "Führt alternative Kontrollflüsse wieder zusammen." },
-        { type: "fork", name: "Fork", label: "", tooltip: "Teilt einen Kontrollfluss in parallel ablaufende Zweige." },
-        { type: "join", name: "Join", label: "", tooltip: "Synchronisiert mehrere parallele Kontrollflüsse." },
-        { type: "end", name: "Ende", label: "", tooltip: "Beendet den gesamten dargestellten Ablauf." }
+        { type: "start", name: "Start", label: "", paletteLabel: "Start", tooltip: "Beginn des dargestellten Ablaufs." },
+        { type: "action", name: "Aktion", label: "", paletteLabel: "Aktion", tooltip: "Ein einzelner Verarbeitungsschritt oder eine Tätigkeit." },
+        { type: "object", name: "Objektknoten", label: "", paletteLabel: "Objektknoten", tooltip: "Zeigt Daten oder Objekte zwischen zwei Aktionen." },
+        { type: "decision", name: "Entscheidung", label: "", paletteLabel: "Entscheidung", tooltip: "Verzweigt den Kontrollfluss anhand einer Bedingung." },
+        { type: "merge", name: "Zusammenführung", label: "", paletteLabel: "Zusammenführung", tooltip: "Führt alternative Kontrollflüsse wieder zusammen." },
+        { type: "fork", name: "Fork", label: "", paletteLabel: "Fork", tooltip: "Teilt einen Kontrollfluss in parallel ablaufende Zweige." },
+        { type: "join", name: "Join", label: "", paletteLabel: "Join", tooltip: "Synchronisiert mehrere parallele Kontrollflüsse." },
+        { type: "flow-final", name: "Flussende", label: "", paletteLabel: "Flussende", tooltip: "Beendet nur den ankommenden Ablaufzweig." },
+        { type: "end", name: "Aktivitätsende", label: "", paletteLabel: "Aktivitätsende", tooltip: "Beendet die gesamte dargestellte Aktivität." },
+        { type: "swimlane", name: "Swimlane", label: "", paletteLabel: "Swimlane", tooltip: "Ordnet Aktionen einer zuständigen Rolle oder Klasse zu." }
       ];
 
       const dimensions = {
         start: { width: 40, height: 40 },
         action: { width: 138, height: 62 },
+        object: { width: 138, height: 62 },
         decision: { width: 108, height: 108 },
         merge: { width: 108, height: 108 },
         fork: { width: 136, height: 12 },
         join: { width: 136, height: 12 },
-        end: { width: 40, height: 40 }
+        "flow-final": { width: 40, height: 40 },
+        end: { width: 40, height: 40 },
+        swimlane: { width: 154, height: 82 }
       };
 
       const palette = document.getElementById("palette");
@@ -702,8 +890,11 @@
 
       let state = loadState();
       let selectedNodeId = null;
+      let selectedSwimlaneId = null;
       let selectedEdgeId = null;
+      let suppressEdgeClickUntil = 0;
       let connectionSource = null;
+      let connectionPointer = null;
       let drag = null;
       let toastTimer = null;
 
@@ -718,27 +909,47 @@
       }
 
       function renderPalette() {
+        palette.replaceChildren();
         tools.forEach((tool) => {
           const button = document.createElement("button");
           button.type = "button";
           button.className = "tool";
           button.dataset.name = tool.name;
+          button.dataset.type = tool.type;
           button.dataset.tooltip = tool.tooltip;
           button.setAttribute("aria-label", `${tool.name} in das Raster ziehen`);
-          button.append(createShape(tool.type, tool.label));
+          button.append(createShape(tool.type, tool.paletteLabel));
           button.addEventListener("pointerdown", (event) => beginPaletteDrag(event, tool));
           palette.append(button);
         });
       }
 
       function defaultState() {
-        return { zoom: 1, nextNodeId: 0, nextEdgeId: 0, nodes: [], edges: [] };
+        return { zoom: 1, nextNodeId: 0, nextEdgeId: 0, nextSwimlaneId: 0, nodes: [], edges: [], swimlanes: [] };
       }
 
       function loadState() {
         try {
           const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
-          if (stored && Array.isArray(stored.nodes) && Array.isArray(stored.edges)) return { ...defaultState(), ...stored };
+          if (stored && Array.isArray(stored.nodes) && Array.isArray(stored.edges)) {
+            const legacySwimlaneNodes = stored.nodes.filter((node) => node.type === "swimlane");
+            const legacySwimlaneIds = new Set(legacySwimlaneNodes.map((node) => node.id));
+            const existingSwimlanes = Array.isArray(stored.swimlanes) ? stored.swimlanes : [];
+            const migratedSwimlanes = legacySwimlaneNodes.map((node, index) => ({
+              id: `s${Number(stored.nextSwimlaneId || existingSwimlanes.length) + index + 1}`,
+              label: node.label === "Swimlane" ? "" : node.label || "",
+              leftColumn: node.column,
+              rightColumn: Math.min(Math.floor(SURFACE_WIDTH / CELL_WIDTH), node.column + 1)
+            }));
+            return {
+              ...defaultState(),
+              ...stored,
+              nextSwimlaneId: Number(stored.nextSwimlaneId || existingSwimlanes.length) + migratedSwimlanes.length,
+              nodes: stored.nodes.filter((node) => node.type !== "swimlane"),
+              edges: stored.edges.filter((edge) => !legacySwimlaneIds.has(edge.from) && !legacySwimlaneIds.has(edge.to)),
+              swimlanes: [...existingSwimlanes, ...migratedSwimlanes]
+            };
+          }
         } catch (_) {}
         return defaultState();
       }
@@ -777,6 +988,142 @@
         return !state.nodes.some((node) => node.id !== ignoredId && node.row === row && node.column === column);
       }
 
+      function swimlaneGeometry(swimlane, element) {
+        element.style.left = `${swimlane.leftColumn * CELL_WIDTH}px`;
+        element.style.width = `${(swimlane.rightColumn - swimlane.leftColumn) * CELL_WIDTH}px`;
+      }
+
+      function beginSwimlaneDrag(event, swimlane, element) {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        selectedNodeId = null;
+        selectedEdgeId = null;
+        selectedSwimlaneId = swimlane.id;
+        drag = {
+          kind: "swimlane",
+          swimlane,
+          element,
+          captureTarget: event.currentTarget,
+          pointerId: event.pointerId,
+          originalLeftColumn: swimlane.leftColumn,
+          originalRightColumn: swimlane.rightColumn,
+          startX: event.clientX,
+          startY: event.clientY,
+          moved: false
+        };
+        trash.textContent = "⌫ Swimlane löschen";
+        trash.classList.add("visible");
+        renderSelection();
+      }
+
+      function beginSwimlaneResize(event, swimlane, element, side) {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const handle = event.currentTarget;
+        const pointerId = event.pointerId;
+        handle.setPointerCapture?.(pointerId);
+        selectedSwimlaneId = swimlane.id;
+        renderSelection();
+        const move = (moveEvent) => {
+          if (moveEvent.pointerId !== pointerId) return;
+          const rect = surface.getBoundingClientRect();
+          const column = Math.max(0, Math.min(Math.floor(SURFACE_WIDTH / CELL_WIDTH), Math.round(((moveEvent.clientX - rect.left) / state.zoom) / CELL_WIDTH)));
+          if (side === "left") swimlane.leftColumn = Math.min(swimlane.rightColumn - 1, column);
+          else swimlane.rightColumn = Math.max(swimlane.leftColumn + 1, column);
+          swimlaneGeometry(swimlane, element);
+        };
+        const finish = (finishEvent) => {
+          if (finishEvent.pointerId !== pointerId) return;
+          handle.removeEventListener("pointermove", move);
+          handle.removeEventListener("pointerup", finish);
+          handle.removeEventListener("pointercancel", cancel);
+          if (handle.hasPointerCapture?.(pointerId)) handle.releasePointerCapture(pointerId);
+          saveState();
+          render();
+        };
+        const cancel = (cancelEvent) => finish(cancelEvent);
+        handle.addEventListener("pointermove", move);
+        handle.addEventListener("pointerup", finish);
+        handle.addEventListener("pointercancel", cancel);
+      }
+
+      function editSwimlane(swimlane, element) {
+        const label = element.querySelector(".swimlane-label");
+        if (!label) return;
+        const input = document.createElement("input");
+        input.className = "swimlane-editor";
+        input.value = swimlane.label;
+        input.placeholder = "Bezeichnung (optional)";
+        input.setAttribute("aria-label", "Bezeichnung der Swimlane bearbeiten");
+        label.replaceWith(input);
+        input.focus();
+        input.select();
+        let finished = false;
+        const finish = (save) => {
+          if (finished || !input.isConnected) return;
+          finished = true;
+          if (save) swimlane.label = input.value.trim();
+          saveState();
+          render();
+        };
+        input.addEventListener("keydown", (keyEvent) => {
+          if (keyEvent.key === "Enter") finish(true);
+          if (keyEvent.key === "Escape") finish(false);
+        });
+        input.addEventListener("blur", () => finish(true));
+      }
+
+      function createSwimlaneElement(swimlane) {
+        const element = document.createElement("section");
+        element.className = `swimlane-container${selectedSwimlaneId === swimlane.id ? " selected" : ""}`;
+        element.dataset.swimlaneId = swimlane.id;
+        element.setAttribute("aria-label", swimlane.label ? `Swimlane ${swimlane.label}` : "Unbenannte Swimlane");
+        swimlaneGeometry(swimlane, element);
+        const label = document.createElement("button");
+        label.type = "button";
+        label.className = "swimlane-label";
+        label.textContent = swimlane.label;
+        label.setAttribute("aria-label", `${swimlane.label || "Unbenannte Swimlane"}; doppelklicken zum Bearbeiten`);
+        label.addEventListener("click", (event) => {
+          event.stopPropagation();
+          selectedNodeId = null;
+          selectedEdgeId = null;
+          selectedSwimlaneId = swimlane.id;
+          renderSelection();
+        });
+        label.addEventListener("dblclick", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          editSwimlane(swimlane, element);
+        });
+        const move = document.createElement("button");
+        move.type = "button";
+        move.className = "swimlane-move";
+        move.textContent = "↔";
+        move.setAttribute("aria-label", "Swimlane verschieben oder löschen");
+        move.addEventListener("pointerdown", (event) => beginSwimlaneDrag(event, swimlane, element));
+        ["left", "right"].forEach((side) => {
+          const boundary = document.createElement("button");
+          boundary.type = "button";
+          boundary.className = `swimlane-boundary ${side}`;
+          boundary.setAttribute("aria-label", `${side === "left" ? "Linke" : "Rechte"} Swimlane-Grenze verschieben`);
+          boundary.addEventListener("pointerdown", (event) => beginSwimlaneResize(event, swimlane, element, side));
+          element.append(boundary);
+        });
+        element.append(label, move);
+        element.addEventListener("click", (event) => {
+          event.stopPropagation();
+          selectedNodeId = null;
+          selectedEdgeId = null;
+          selectedSwimlaneId = swimlane.id;
+          renderSelection();
+        });
+        return element;
+      }
+
       function beginPaletteDrag(event, tool) {
         if (event.button !== 0) return;
         event.preventDefault();
@@ -791,12 +1138,15 @@
       function beginNodeDrag(event, node) {
         if (event.button !== 0 || event.target.closest(".port") || event.target.closest(".node-editor")) return;
         event.preventDefault();
+        event.currentTarget.setPointerCapture?.(event.pointerId);
         selectedNodeId = node.id;
+        selectedSwimlaneId = null;
         selectedEdgeId = null;
         drag = {
           kind: "existing",
           node,
           element: event.currentTarget,
+          pointerId: event.pointerId,
           originalRow: node.row,
           originalColumn: node.column,
           startX: event.clientX,
@@ -804,6 +1154,33 @@
           moved: false
         };
         event.currentTarget.classList.add("dragging");
+        trash.textContent = "⌫ Element löschen";
+        trash.classList.add("visible");
+        renderSelection();
+      }
+
+      function beginEdgeDrag(event, edge, handle) {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const captureTarget = event.currentTarget;
+        captureTarget.setPointerCapture?.(event.pointerId);
+        selectedNodeId = null;
+        selectedSwimlaneId = null;
+        selectedEdgeId = edge.id;
+        drag = {
+          kind: "edge",
+          edge,
+          handle,
+          captureTarget,
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          moved: false,
+          ghost: null
+        };
+        handle.classList.add("dragging");
+        trash.textContent = "⌫ Pfeil löschen";
         trash.classList.add("visible");
         renderSelection();
       }
@@ -815,7 +1192,8 @@
       }
 
       function handlePointerMove(event) {
-        if (!drag) return;
+        updateConnectionPreview(event.clientX, event.clientY);
+        if (!drag || (drag.pointerId !== undefined && event.pointerId !== drag.pointerId)) return;
         const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
         if (distance > 5) drag.moved = true;
         if (drag.kind === "new") {
@@ -823,6 +1201,29 @@
           return;
         }
         if (!drag.moved) return;
+        if (drag.kind === "edge") {
+          if (!drag.ghost) {
+            drag.ghost = document.createElement("div");
+            drag.ghost.className = "edge-drag-ghost";
+            document.body.append(drag.ghost);
+          }
+          drag.ghost.style.left = `${event.clientX}px`;
+          drag.ghost.style.top = `${event.clientY}px`;
+          trash.classList.toggle("over", isPointInside(trash, event.clientX, event.clientY));
+          return;
+        }
+        if (drag.kind === "swimlane") {
+          const overTrash = isPointInside(trash, event.clientX, event.clientY);
+          trash.classList.toggle("over", overTrash);
+          if (overTrash) return;
+          const delta = Math.round((event.clientX - drag.startX) / (CELL_WIDTH * state.zoom));
+          const width = drag.originalRightColumn - drag.originalLeftColumn;
+          const maximumLeft = Math.floor(SURFACE_WIDTH / CELL_WIDTH) - width;
+          drag.swimlane.leftColumn = Math.max(0, Math.min(maximumLeft, drag.originalLeftColumn + delta));
+          drag.swimlane.rightColumn = drag.swimlane.leftColumn + width;
+          swimlaneGeometry(drag.swimlane, drag.element);
+          return;
+        }
         const rect = surface.getBoundingClientRect();
         drag.element.style.left = `${(event.clientX - rect.left) / state.zoom}px`;
         drag.element.style.top = `${(event.clientY - rect.top) / state.zoom}px`;
@@ -830,11 +1231,26 @@
       }
 
       function finishDrag(event) {
-        if (!drag) return;
+        if (!drag || (drag.pointerId !== undefined && event.pointerId !== drag.pointerId)) return;
         if (drag.kind === "new") {
           drag.ghost.remove();
           if (isPointInside(viewport, event.clientX, event.clientY)) {
             const cell = cellFromClient(event.clientX, event.clientY);
+            if (drag.tool.type === "swimlane") {
+              state.swimlanes.push({
+                id: `s${++state.nextSwimlaneId}`,
+                label: "",
+                leftColumn: cell.column,
+                rightColumn: Math.min(Math.floor(SURFACE_WIDTH / CELL_WIDTH), cell.column + 1)
+              });
+              selectedNodeId = null;
+              selectedEdgeId = null;
+              selectedSwimlaneId = state.swimlanes.at(-1).id;
+              saveState();
+              render();
+              drag = null;
+              return;
+            }
             if (cellAvailable(cell.row, cell.column)) {
               state.nodes.push({
                 id: `n${++state.nextNodeId}`,
@@ -844,12 +1260,54 @@
                 column: cell.column
               });
               selectedNodeId = state.nodes.at(-1).id;
+              selectedSwimlaneId = null;
               saveState();
               render();
             } else showToast("Dieses Rasterfeld ist bereits belegt.");
           }
+        } else if (drag.kind === "edge") {
+          const droppedOnTrash = drag.moved && (trash.classList.contains("over") || isPointInside(trash, event.clientX, event.clientY));
+          if (drag.captureTarget.hasPointerCapture?.(drag.pointerId)) drag.captureTarget.releasePointerCapture(drag.pointerId);
+          drag.handle.classList.remove("dragging");
+          drag.ghost?.remove();
+          trash.classList.remove("visible", "over");
+          if (!drag.moved) {
+            drag = null;
+            return;
+          }
+          suppressEdgeClickUntil = performance.now() + 250;
+          if (droppedOnTrash) {
+            state.edges = state.edges.filter((edge) => edge.id !== drag.edge.id);
+            selectedEdgeId = null;
+            saveState();
+            render();
+            showToast("Pfeil gelöscht.");
+          } else render();
+        } else if (drag.kind === "swimlane") {
+          const droppedOnTrash = drag.moved && (trash.classList.contains("over") || isPointInside(trash, event.clientX, event.clientY));
+          if (drag.captureTarget.hasPointerCapture?.(drag.pointerId)) drag.captureTarget.releasePointerCapture(drag.pointerId);
+          trash.classList.remove("visible", "over");
+          if (!drag.moved) {
+            drag = null;
+            return;
+          }
+          if (droppedOnTrash) {
+            state.swimlanes = state.swimlanes.filter((swimlane) => swimlane.id !== drag.swimlane.id);
+            selectedSwimlaneId = null;
+            saveState();
+            render();
+            showToast("Swimlane gelöscht.");
+          } else if (isPointInside(viewport, event.clientX, event.clientY)) {
+            saveState();
+            render();
+          } else {
+            drag.swimlane.leftColumn = drag.originalLeftColumn;
+            drag.swimlane.rightColumn = drag.originalRightColumn;
+            render();
+          }
         } else {
-          const droppedOnTrash = drag.moved && isPointInside(trash, event.clientX, event.clientY);
+          const droppedOnTrash = drag.moved && (trash.classList.contains("over") || isPointInside(trash, event.clientX, event.clientY));
+          if (drag.element.hasPointerCapture?.(drag.pointerId)) drag.element.releasePointerCapture(drag.pointerId);
           trash.classList.remove("visible", "over");
           drag.element.classList.remove("dragging");
           if (!drag.moved) {
@@ -857,13 +1315,12 @@
             return;
           }
           if (droppedOnTrash) {
-            if (window.confirm("Soll dieses Element mit seinen Verbindungen wirklich gelöscht werden?")) {
-              state.nodes = state.nodes.filter((node) => node.id !== drag.node.id);
-              state.edges = state.edges.filter((edge) => edge.from !== drag.node.id && edge.to !== drag.node.id);
-              selectedNodeId = null;
-              saveState();
-              render();
-            } else render();
+            state.nodes = state.nodes.filter((node) => node.id !== drag.node.id);
+            state.edges = state.edges.filter((edge) => edge.from !== drag.node.id && edge.to !== drag.node.id);
+            selectedNodeId = null;
+            saveState();
+            render();
+            showToast("Element gelöscht.");
           } else if (drag.moved && isPointInside(viewport, event.clientX, event.clientY)) {
             const cell = cellFromClient(event.clientX, event.clientY);
             if (cellAvailable(cell.row, cell.column, drag.node.id)) {
@@ -873,6 +1330,28 @@
             } else showToast("Dieses Rasterfeld ist bereits belegt.");
             render();
           } else render();
+        }
+        drag = null;
+      }
+
+      function cancelDrag(event) {
+        if (!drag || (drag.pointerId !== undefined && event.pointerId !== drag.pointerId)) return;
+        drag.ghost?.remove();
+        if (drag.kind === "edge") {
+          if (drag.captureTarget.hasPointerCapture?.(drag.pointerId)) drag.captureTarget.releasePointerCapture(drag.pointerId);
+          drag.handle.classList.remove("dragging");
+          trash.classList.remove("visible", "over");
+          render();
+        } else if (drag.kind === "existing") {
+          if (drag.element.hasPointerCapture?.(drag.pointerId)) drag.element.releasePointerCapture(drag.pointerId);
+          trash.classList.remove("visible", "over");
+          render();
+        } else if (drag.kind === "swimlane") {
+          if (drag.captureTarget.hasPointerCapture?.(drag.pointerId)) drag.captureTarget.releasePointerCapture(drag.pointerId);
+          drag.swimlane.leftColumn = drag.originalLeftColumn;
+          drag.swimlane.rightColumn = drag.originalRightColumn;
+          trash.classList.remove("visible", "over");
+          render();
         }
         drag = null;
       }
@@ -895,12 +1374,24 @@
         return dy > 0 ? "top" : "bottom";
       }
 
+      function bestSourceSide(source, target, fallback = "right") {
+        if (source.id === target.id) return fallback;
+        const dx = target.column - source.column;
+        const dy = target.row - source.row;
+        if (["fork", "join"].includes(source.type)) return dy < 0 ? "top" : "bottom";
+        if (Math.abs(dx) > Math.abs(dy)) return dx < 0 ? "left" : "right";
+        return dy < 0 ? "top" : "bottom";
+      }
+
       function routeFor(edge) {
         const source = state.nodes.find((node) => node.id === edge.from);
         const target = state.nodes.find((node) => node.id === edge.to);
         if (!source || !target) return null;
-        const start = portPoint(source, edge.side);
-        const targetSide = bestTargetSide(source, target);
+        const sourceSide = bestSourceSide(source, target, edge.side);
+        const start = portPoint(source, sourceSide);
+        const targetSide = ["fork", "join"].includes(target.type)
+          ? (source.row <= target.row ? "top" : "bottom")
+          : bestTargetSide(source, target);
         const end = portPoint(target, targetSide);
 
         if (source.id === target.id) {
@@ -908,12 +1399,12 @@
           return [start, { x: start.x + offset, y: start.y }, { x: start.x + offset, y: start.y + offset }, { x: end.x, y: start.y + offset }, end];
         }
 
-        if (["left", "right"].includes(edge.side)) {
-          const outward = edge.side === "right" ? 28 : -28;
+        if (["left", "right"].includes(sourceSide)) {
+          const outward = sourceSide === "right" ? 28 : -28;
           const first = { x: start.x + outward, y: start.y };
           return [start, first, { x: first.x, y: end.y }, end];
         }
-        const outward = edge.side === "bottom" ? 28 : -28;
+        const outward = sourceSide === "bottom" ? 28 : -28;
         const first = { x: start.x, y: start.y + outward };
         return [start, first, { x: end.x, y: first.y }, end];
       }
@@ -996,13 +1487,24 @@
           });
           hit.dataset.edgeId = edge.id;
           const line = svgElement("path", { class: "connection-line", d, "marker-end": "url(#openArrow)" });
+          const middle = routeMiddle(route);
+          const editHandle = document.createElement("button");
+          editHandle.type = "button";
+          editHandle.className = "edge-handle";
+          editHandle.setAttribute("aria-label", "Kontrollfluss bearbeiten oder zum Löschen ziehen");
+          editHandle.style.left = `${middle.x}px`;
+          editHandle.style.top = `${middle.y}px`;
+          hit.addEventListener("pointerdown", (event) => beginEdgeDrag(event, edge, editHandle));
           hit.addEventListener("click", (event) => {
+            if (performance.now() < suppressEdgeClickUntil) return;
             event.stopPropagation();
             selectedNodeId = null;
+            selectedSwimlaneId = null;
             selectedEdgeId = edge.id;
             renderSelection();
           });
           hit.addEventListener("dblclick", (event) => {
+            if (performance.now() < suppressEdgeClickUntil) return;
             event.stopPropagation();
             editEdge(edge, route);
           });
@@ -1021,20 +1523,17 @@
           }
           connectionsSvg.append(group);
 
-          const middle = routeMiddle(route);
-          const editHandle = document.createElement("button");
-          editHandle.type = "button";
-          editHandle.className = "edge-handle";
-          editHandle.setAttribute("aria-label", "Kontrollfluss bearbeiten");
-          editHandle.style.left = `${middle.x}px`;
-          editHandle.style.top = `${middle.y}px`;
+          editHandle.addEventListener("pointerdown", (event) => beginEdgeDrag(event, edge, editHandle));
           editHandle.addEventListener("click", (event) => {
+            if (performance.now() < suppressEdgeClickUntil) return;
             event.stopPropagation();
             selectedNodeId = null;
+            selectedSwimlaneId = null;
             selectedEdgeId = edge.id;
             renderSelection();
           });
           editHandle.addEventListener("dblclick", (event) => {
+            if (performance.now() < suppressEdgeClickUntil) return;
             event.stopPropagation();
             editEdge(edge, route);
           });
@@ -1046,17 +1545,65 @@
           });
           surface.append(editHandle);
         });
+        renderConnectionPreview();
+      }
+
+      function connectionPointFromClient(clientX, clientY) {
+        const rect = surface.getBoundingClientRect();
+        return {
+          x: (clientX - rect.left) / state.zoom,
+          y: (clientY - rect.top) / state.zoom
+        };
+      }
+
+      function renderConnectionPreview() {
+        connectionsSvg.querySelector(".connection-preview")?.remove();
+        if (!connectionSource || !connectionPointer) return;
+        const source = state.nodes.find((node) => node.id === connectionSource.nodeId);
+        if (!source) return;
+        const center = cellCenter(source.row, source.column);
+        const dx = connectionPointer.x - center.x;
+        const dy = connectionPointer.y - center.y;
+        const side = ["fork", "join"].includes(source.type)
+          ? (dy < 0 ? "top" : "bottom")
+          : Math.abs(dx) >= Math.abs(dy)
+            ? (dx < 0 ? "left" : "right")
+            : (dy < 0 ? "top" : "bottom");
+        const start = portPoint(source, side);
+        const outward = 28;
+        const points = [start];
+        if (["left", "right"].includes(side)) {
+          const first = { x: start.x + (side === "right" ? outward : -outward), y: start.y };
+          points.push(first, { x: first.x, y: connectionPointer.y }, connectionPointer);
+        } else {
+          const first = { x: start.x, y: start.y + (side === "bottom" ? outward : -outward) };
+          points.push(first, { x: connectionPointer.x, y: first.y }, connectionPointer);
+        }
+        connectionsSvg.append(svgElement("path", {
+          class: "connection-preview",
+          d: pathData(points),
+          "marker-end": "url(#openArrow)"
+        }));
+      }
+
+      function updateConnectionPreview(clientX, clientY) {
+        if (!connectionSource) return;
+        connectionPointer = connectionPointFromClient(clientX, clientY);
+        renderConnectionPreview();
       }
 
       function beginConnection(event, node, side, button) {
         event.preventDefault();
         event.stopPropagation();
         connectionSource = { nodeId: node.id, side };
+        connectionPointer = connectionPointFromClient(event.clientX, event.clientY);
         selectedNodeId = node.id;
+        selectedSwimlaneId = null;
         selectedEdgeId = null;
         surface.classList.add("connecting");
         surface.querySelectorAll(".port").forEach((port) => port.classList.remove("active"));
         button.classList.add("active");
+        renderConnectionPreview();
         showToast("Wähle jetzt das Zielelement.");
       }
 
@@ -1070,6 +1617,7 @@
           label: ""
         });
         connectionSource = null;
+        connectionPointer = null;
         surface.classList.remove("connecting");
         saveState();
         render();
@@ -1129,6 +1677,7 @@
           event.stopPropagation();
           if (finishConnection(node)) return;
           selectedNodeId = node.id;
+          selectedSwimlaneId = null;
           selectedEdgeId = null;
           renderSelection();
         });
@@ -1141,6 +1690,7 @@
 
       function renderSelection() {
         surface.querySelectorAll(".node").forEach((element) => element.classList.toggle("selected", element.dataset.nodeId === selectedNodeId));
+        surface.querySelectorAll(".swimlane-container").forEach((element) => element.classList.toggle("selected", element.dataset.swimlaneId === selectedSwimlaneId));
         surface.querySelectorAll(".connection-group").forEach((element) => element.classList.toggle("selected", element.querySelector(".connection-hit")?.dataset.edgeId === selectedEdgeId));
       }
 
@@ -1152,9 +1702,11 @@
 
       function render() {
         surface.querySelectorAll(".node").forEach((node) => node.remove());
+        surface.querySelectorAll(".swimlane-container").forEach((swimlane) => swimlane.remove());
         surface.querySelectorAll(".edge-handle, .edge-editor").forEach((element) => element.remove());
+        state.swimlanes.forEach((swimlane) => surface.append(createSwimlaneElement(swimlane)));
         state.nodes.forEach((node) => surface.append(createNodeElement(node)));
-        emptyState.hidden = state.nodes.length > 0;
+        emptyState.hidden = state.nodes.length > 0 || state.swimlanes.length > 0;
         renderConnections();
         applyZoom();
       }
@@ -1177,20 +1729,36 @@
 
       surface.addEventListener("click", () => {
         connectionSource = null;
+        connectionPointer = null;
         selectedNodeId = null;
+        selectedSwimlaneId = null;
         selectedEdgeId = null;
         surface.classList.remove("connecting");
         renderSelection();
+        renderConnectionPreview();
+      });
+
+      document.addEventListener("click", (event) => {
+        if (!connectionSource || event.target.closest?.(".node, .port")) return;
+        connectionSource = null;
+        connectionPointer = null;
+        surface.classList.remove("connecting");
+        renderSelection();
+        renderConnectionPreview();
       });
 
       document.addEventListener("pointermove", handlePointerMove);
       document.addEventListener("pointerup", finishDrag);
+      document.addEventListener("pointercancel", cancelDrag);
       document.addEventListener("keydown", (event) => {
         if (!["Delete", "Backspace"].includes(event.key) || event.target.matches("input")) return;
         if (selectedNodeId) {
           state.nodes = state.nodes.filter((node) => node.id !== selectedNodeId);
           state.edges = state.edges.filter((edge) => edge.from !== selectedNodeId && edge.to !== selectedNodeId);
           selectedNodeId = null;
+        } else if (selectedSwimlaneId) {
+          state.swimlanes = state.swimlanes.filter((swimlane) => swimlane.id !== selectedSwimlaneId);
+          selectedSwimlaneId = null;
         } else if (selectedEdgeId) {
           state.edges = state.edges.filter((edge) => edge.id !== selectedEdgeId);
           selectedEdgeId = null;
@@ -1201,9 +1769,10 @@
       });
 
       resetButton.addEventListener("click", () => {
-        if (!state.nodes.length || window.confirm("Soll die gesamte Arbeitsfläche wirklich zurückgesetzt werden?")) {
+        if ((!state.nodes.length && !state.swimlanes.length) || window.confirm("Soll die gesamte Arbeitsfläche wirklich zurückgesetzt werden?")) {
           state = defaultState();
           selectedNodeId = null;
+          selectedSwimlaneId = null;
           selectedEdgeId = null;
           connectionSource = null;
           localStorage.removeItem(STORAGE_KEY);
