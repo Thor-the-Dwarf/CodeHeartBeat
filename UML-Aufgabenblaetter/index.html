@@ -1356,15 +1356,15 @@
         drag = null;
       }
 
-      function portPoint(node, side) {
+      function portPoint(node, side, offset = 0) {
         const center = cellCenter(node.row, node.column);
         const size = dimensions[node.type];
         const halfWidth = size.width / 2;
         const halfHeight = size.height / 2;
-        if (side === "top") return { x: center.x, y: center.y - halfHeight };
-        if (side === "bottom") return { x: center.x, y: center.y + halfHeight };
-        if (side === "left") return { x: center.x - halfWidth, y: center.y };
-        return { x: center.x + halfWidth, y: center.y };
+        if (side === "top") return { x: center.x + offset, y: center.y - halfHeight };
+        if (side === "bottom") return { x: center.x + offset, y: center.y + halfHeight };
+        if (side === "left") return { x: center.x - halfWidth, y: center.y + offset };
+        return { x: center.x + halfWidth, y: center.y + offset };
       }
 
       function bestTargetSide(source, target) {
@@ -1383,16 +1383,52 @@
         return dy < 0 ? "top" : "bottom";
       }
 
+      function targetSideFor(source, target) {
+        return ["fork", "join"].includes(target.type)
+          ? (source.row <= target.row ? "top" : "bottom")
+          : bestTargetSide(source, target);
+      }
+
+      function distributedBarPort(node, side, edge, endpoint) {
+        if (!["fork", "join"].includes(node.type) || !["top", "bottom"].includes(side)) {
+          return { offset: 0, index: 0, count: 1 };
+        }
+        const peers = state.edges.map((candidate) => {
+          const source = state.nodes.find((item) => item.id === candidate.from);
+          const target = state.nodes.find((item) => item.id === candidate.to);
+          if (!source || !target) return null;
+          if (endpoint === "source") {
+            if (candidate.from !== node.id || bestSourceSide(source, target, candidate.side) !== side) return null;
+            return { edge: candidate, other: target };
+          }
+          if (candidate.to !== node.id || targetSideFor(source, target) !== side) return null;
+          return { edge: candidate, other: source };
+        }).filter(Boolean).sort((left, right) => {
+          const columnDifference = left.other.column - right.other.column;
+          if (columnDifference) return columnDifference;
+          const rowDifference = left.other.row - right.other.row;
+          if (rowDifference) return rowDifference;
+          return String(left.edge.id).localeCompare(String(right.edge.id));
+        });
+        const index = Math.max(0, peers.findIndex((peer) => peer.edge.id === edge.id));
+        const gap = peers.length > 1 ? Math.min(34, 100 / (peers.length - 1)) : 0;
+        return {
+          offset: (index - (peers.length - 1) / 2) * gap,
+          index,
+          count: peers.length
+        };
+      }
+
       function routeFor(edge) {
         const source = state.nodes.find((node) => node.id === edge.from);
         const target = state.nodes.find((node) => node.id === edge.to);
         if (!source || !target) return null;
         const sourceSide = bestSourceSide(source, target, edge.side);
-        const start = portPoint(source, sourceSide);
-        const targetSide = ["fork", "join"].includes(target.type)
-          ? (source.row <= target.row ? "top" : "bottom")
-          : bestTargetSide(source, target);
-        const end = portPoint(target, targetSide);
+        const targetSide = targetSideFor(source, target);
+        const sourcePort = distributedBarPort(source, sourceSide, edge, "source");
+        const targetPort = distributedBarPort(target, targetSide, edge, "target");
+        const start = portPoint(source, sourceSide, sourcePort.offset);
+        const end = portPoint(target, targetSide, targetPort.offset);
 
         if (source.id === target.id) {
           const offset = 52;
@@ -1402,9 +1438,16 @@
         if (["left", "right"].includes(sourceSide)) {
           const outward = sourceSide === "right" ? 28 : -28;
           const first = { x: start.x + outward, y: start.y };
+          if (["fork", "join"].includes(target.type)) {
+            const approachDistance = 24 + targetPort.index * 14;
+            const approachY = end.y + (targetSide === "top" ? -approachDistance : approachDistance);
+            return [start, first, { x: first.x, y: approachY }, { x: end.x, y: approachY }, end];
+          }
           return [start, first, { x: first.x, y: end.y }, end];
         }
-        const outward = sourceSide === "bottom" ? 28 : -28;
+        const laneIndex = ["fork", "join"].includes(source.type) ? sourcePort.index : targetPort.index;
+        const outwardDistance = 28 + laneIndex * 14;
+        const outward = sourceSide === "bottom" ? outwardDistance : -outwardDistance;
         const first = { x: start.x, y: start.y + outward };
         return [start, first, { x: end.x, y: first.y }, end];
       }
