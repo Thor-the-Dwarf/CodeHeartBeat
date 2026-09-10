@@ -79,7 +79,8 @@
       background: rgba(231, 189, 85, 0.07);
     }
 
-    .reset-button {
+    .reset-button,
+    .evaluate-button {
       padding: 8px 12px;
       border: 1px solid rgba(255, 116, 151, 0.38);
       border-radius: 5px;
@@ -91,10 +92,24 @@
     }
 
     .reset-button:hover,
-    .reset-button:focus-visible {
+    .reset-button:focus-visible,
+    .evaluate-button:hover,
+    .evaluate-button:focus-visible {
       border-color: #ff9ab3;
       outline: none;
       background: rgba(255, 116, 151, 0.14);
+    }
+
+    .evaluate-button {
+      border-color: rgba(99, 217, 164, 0.48);
+      color: #8cebbd;
+      background: rgba(99, 217, 164, 0.08);
+    }
+
+    .evaluate-button:hover,
+    .evaluate-button:focus-visible {
+      border-color: #63d9a4;
+      background: rgba(99, 217, 164, 0.16);
     }
 
     .workspace {
@@ -629,6 +644,28 @@
     .node.selected .shape { border-color: var(--purple); filter: drop-shadow(0 0 9px rgba(199, 125, 255, 0.42)); }
     .node .shape { pointer-events: none; }
 
+    .node.evaluation-correct .shape {
+      border-color: #63d9a4;
+      box-shadow: inset 0 0 0 1px rgba(99, 217, 164, 0.3);
+      filter: drop-shadow(0 0 9px rgba(99, 217, 164, 0.62));
+    }
+
+    .node.evaluation-wrong .shape {
+      border-color: #ff6c91;
+      box-shadow: inset 0 0 0 1px rgba(255, 108, 145, 0.28);
+      filter: drop-shadow(0 0 9px rgba(255, 108, 145, 0.58));
+    }
+
+    .connection-group.evaluation-correct .connection-line {
+      stroke: #63d9a4;
+      filter: drop-shadow(0 0 5px rgba(99, 217, 164, 0.62));
+    }
+
+    .connection-group.evaluation-wrong .connection-line {
+      stroke: #ff6c91;
+      filter: drop-shadow(0 0 5px rgba(255, 108, 145, 0.55));
+    }
+
     .node-label {
       display: block;
       max-width: 124px;
@@ -747,6 +784,96 @@
 
     .toast.visible { display: block; animation: toast-in 180ms ease-out; }
 
+    .evaluation-panel {
+      position: fixed;
+      z-index: 110;
+      top: 72px;
+      right: 18px;
+      bottom: 18px;
+      width: min(520px, calc(100vw - 36px));
+      overflow: auto;
+      padding: 18px;
+      border: 1px solid rgba(99, 217, 164, 0.45);
+      border-radius: 9px;
+      background: rgba(10, 14, 20, 0.98);
+      box-shadow: 0 20px 55px rgba(0, 0, 0, 0.68);
+    }
+
+    .evaluation-panel[hidden] { display: none; }
+
+    .evaluation-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .evaluation-header h2 { margin: 0 0 5px; font-size: 15px; }
+    .evaluation-header p { margin: 0; color: #9eabb9; font: 600 11px/1.5 system-ui, sans-serif; }
+
+    .evaluation-close {
+      margin-left: auto;
+      padding: 5px 8px;
+      border: 1px solid rgba(199, 125, 255, 0.35);
+      border-radius: 4px;
+      color: #dfd4e8;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .evaluation-summary {
+      margin-bottom: 14px;
+      padding: 12px;
+      border-left: 3px solid #63d9a4;
+      color: #cbd7e2;
+      background: rgba(99, 217, 164, 0.07);
+      font: 650 11px/1.55 system-ui, sans-serif;
+    }
+
+    .solution-list { display: grid; gap: 12px; }
+
+    .solution-card {
+      padding: 12px;
+      border: 1px solid rgba(142, 90, 170, 0.42);
+      border-radius: 7px;
+      background: rgba(17, 13, 24, 0.78);
+    }
+
+    .solution-card.closest {
+      border-color: #63d9a4;
+      box-shadow: inset 0 0 0 1px rgba(99, 217, 164, 0.18);
+    }
+
+    .solution-card-header { display: flex; align-items: center; gap: 10px; }
+    .solution-card h3 { margin: 0; font-size: 11px; }
+    .solution-score { margin-left: auto; color: #8cebbd; font-size: 12px; font-weight: 900; }
+    .solution-badge { color: #63d9a4; font-size: 8px; font-weight: 900; text-transform: uppercase; }
+    .solution-preview { display: block; width: 100%; height: 180px; margin-top: 8px; }
+    .solution-preview path { fill: none; stroke: #8291a3; stroke-width: 1.5; }
+    .solution-preview .preview-node { fill: #15212c; stroke: #9fb1c4; stroke-width: 1.5; }
+    .solution-preview .preview-start { fill: #dbe7f2; }
+    .solution-preview .preview-end-inner { fill: #dbe7f2; stroke: none; }
+
+    .evaluation-legend {
+      display: flex;
+      gap: 16px;
+      margin-top: 14px;
+      color: #aab6c4;
+      font: 650 10px/1.4 system-ui, sans-serif;
+    }
+
+    .evaluation-legend span::before {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      margin-right: 6px;
+      border-radius: 50%;
+      content: "";
+      background: #63d9a4;
+    }
+
+    .evaluation-legend span:last-child::before { background: #ff6c91; }
+
     @keyframes toast-in {
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
@@ -768,7 +895,8 @@
     <header class="appbar">
       <h1>UML-AUFGABENBLATT</h1>
       <span class="diagram-kind">Aktivitätsdiagramm</span>
-      <span class="prototype-badge">Prototyp ohne Auswertung</span>
+      <span class="prototype-badge">Prototyp mit Strukturauswertung</span>
+      <button class="evaluate-button" id="evaluateButton" type="button">Auswerten</button>
       <button class="reset-button" id="resetButton" type="button">Arbeitsfläche zurücksetzen</button>
     </header>
 
@@ -815,7 +943,7 @@
             </ul>
           </section>
 
-          <p class="hint">Die Arbeitsfläche wird automatisch in diesem Browser gespeichert. Eine fachliche Auswertung ist in diesem Prototyp noch nicht enthalten.</p>
+          <p class="hint">Die Arbeitsfläche wird automatisch in diesem Browser gespeichert. Die Auswertung vergleicht Elementtypen und Verbindungen; Beschriftungen und Positionen werden nicht bewertet.</p>
         </article>
       </section>
 
@@ -841,6 +969,18 @@
 
   <div class="trash" id="trash">⌫ Element löschen</div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <aside class="evaluation-panel" id="evaluationPanel" aria-labelledby="evaluationTitle" hidden>
+    <header class="evaluation-header">
+      <div>
+        <h2 id="evaluationTitle">Strukturauswertung</h2>
+        <p>Texte und Anordnung werden bewusst nicht berücksichtigt.</p>
+      </div>
+      <button class="evaluation-close" id="evaluationClose" type="button" aria-label="Auswertung schließen">✕</button>
+    </header>
+    <div class="evaluation-summary" id="evaluationSummary"></div>
+    <div class="solution-list" id="solutionList"></div>
+    <div class="evaluation-legend"><span>passt zur ähnlichsten Lösung</span><span>zusätzlich oder abweichend</span></div>
+  </aside>
 
   <script>
     (() => {
@@ -863,6 +1003,47 @@
         { type: "flow-final", name: "Flussende", label: "", paletteLabel: "Flussende", tooltip: "Beendet nur den ankommenden Ablaufzweig." },
         { type: "end", name: "Aktivitätsende", label: "", paletteLabel: "Aktivitätsende", tooltip: "Beendet die gesamte dargestellte Aktivität." },
         { type: "swimlane", name: "Swimlane", label: "", paletteLabel: "Swimlane", tooltip: "Ordnet Aktionen einer zuständigen Rolle oder Klasse zu." }
+      ];
+      const solutionPatterns = [
+        {
+          id: "integrated-header",
+          name: "Kopfzeile beim Einlesen überspringen",
+          nodes: [
+            { id: "start", type: "start", x: 150, y: 14 },
+            { id: "read", type: "action", x: 150, y: 48 },
+            { id: "check", type: "decision", x: 150, y: 91 },
+            { id: "split", type: "action", x: 72, y: 137 },
+            { id: "output", type: "action", x: 72, y: 169 },
+            { id: "end", type: "end", x: 236, y: 137 }
+          ],
+          edges: [["start", "read"], ["read", "check"], ["check", "split"], ["split", "output"], ["output", "check"], ["check", "end"]]
+        },
+        {
+          id: "separate-header",
+          name: "Kopfzeile als eigener Schritt",
+          nodes: [
+            { id: "start", type: "start", x: 150, y: 12 },
+            { id: "read", type: "action", x: 150, y: 41 },
+            { id: "skip", type: "action", x: 150, y: 70 },
+            { id: "check", type: "decision", x: 150, y: 106 },
+            { id: "split", type: "action", x: 72, y: 145 },
+            { id: "output", type: "action", x: 72, y: 173 },
+            { id: "end", type: "end", x: 236, y: 145 }
+          ],
+          edges: [["start", "read"], ["read", "skip"], ["skip", "check"], ["check", "split"], ["split", "output"], ["output", "check"], ["check", "end"]]
+        },
+        {
+          id: "combined-processing",
+          name: "Zerlegen und Ausgeben zusammenfassen",
+          nodes: [
+            { id: "start", type: "start", x: 150, y: 18 },
+            { id: "read", type: "action", x: 150, y: 58 },
+            { id: "check", type: "decision", x: 150, y: 103 },
+            { id: "process", type: "action", x: 72, y: 154 },
+            { id: "end", type: "end", x: 236, y: 154 }
+          ],
+          edges: [["start", "read"], ["read", "check"], ["check", "process"], ["process", "check"], ["check", "end"]]
+        }
       ];
 
       const dimensions = {
@@ -887,6 +1068,11 @@
       const trash = document.getElementById("trash");
       const toast = document.getElementById("toast");
       const resetButton = document.getElementById("resetButton");
+      const evaluateButton = document.getElementById("evaluateButton");
+      const evaluationPanel = document.getElementById("evaluationPanel");
+      const evaluationClose = document.getElementById("evaluationClose");
+      const evaluationSummary = document.getElementById("evaluationSummary");
+      const solutionList = document.getElementById("solutionList");
 
       let state = loadState();
       let selectedNodeId = null;
@@ -897,6 +1083,7 @@
       let connectionPointer = null;
       let drag = null;
       let toastTimer = null;
+      let evaluation = null;
 
       function createShape(type, label = "") {
         const shape = document.createElement("div");
@@ -954,7 +1141,11 @@
         return defaultState();
       }
 
-      function saveState() {
+      function saveState(keepEvaluation = false) {
+        if (!keepEvaluation && evaluation) {
+          evaluation = null;
+          evaluationPanel.hidden = true;
+        }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       }
 
@@ -963,6 +1154,161 @@
         toast.textContent = message;
         toast.classList.add("visible");
         toastTimer = setTimeout(() => toast.classList.remove("visible"), 2400);
+      }
+
+      function mappingQuality(pattern, mapping) {
+        const mappedNodes = Object.values(mapping).filter(Boolean).length;
+        const matchedEdges = pattern.edges.filter(([from, to]) => {
+          const actualFrom = mapping[from];
+          const actualTo = mapping[to];
+          return actualFrom && actualTo && state.edges.some((edge) => edge.from === actualFrom && edge.to === actualTo);
+        }).length;
+        return mappedNodes + matchedEdges * 3;
+      }
+
+      function evaluatePattern(pattern) {
+        let candidates = [{ mapping: {}, used: new Set() }];
+        pattern.nodes.forEach((templateNode) => {
+          const matchingNodes = state.nodes.filter((node) => node.type === templateNode.type);
+          const expanded = [];
+          candidates.forEach((candidate) => {
+            expanded.push({ mapping: { ...candidate.mapping, [templateNode.id]: null }, used: new Set(candidate.used) });
+            matchingNodes.forEach((node) => {
+              if (candidate.used.has(node.id)) return;
+              const used = new Set(candidate.used);
+              used.add(node.id);
+              expanded.push({ mapping: { ...candidate.mapping, [templateNode.id]: node.id }, used });
+            });
+          });
+          candidates = expanded
+            .sort((left, right) => mappingQuality(pattern, right.mapping) - mappingQuality(pattern, left.mapping))
+            .slice(0, 6000);
+        });
+
+        const scored = candidates.map((candidate) => {
+          const correctEdgeIds = new Set();
+          let matchedEdges = 0;
+          pattern.edges.forEach(([from, to]) => {
+            const actualFrom = candidate.mapping[from];
+            const actualTo = candidate.mapping[to];
+            const actualEdge = actualFrom && actualTo
+              ? state.edges.find((edge) => !correctEdgeIds.has(edge.id) && edge.from === actualFrom && edge.to === actualTo)
+              : null;
+            if (!actualEdge) return;
+            correctEdgeIds.add(actualEdge.id);
+            matchedEdges += 1;
+          });
+          const correctNodeIds = new Set(Object.values(candidate.mapping).filter(Boolean));
+          const matchedNodes = correctNodeIds.size;
+          const extraNodes = Math.max(0, state.nodes.length - matchedNodes);
+          const extraEdges = Math.max(0, state.edges.length - matchedEdges);
+          const matchedWeight = matchedNodes + matchedEdges * 2;
+          const requiredWeight = pattern.nodes.length + pattern.edges.length * 2;
+          const denominator = requiredWeight + extraNodes + extraEdges;
+          return {
+            pattern,
+            mapping: candidate.mapping,
+            correctNodeIds,
+            correctEdgeIds,
+            matchedNodes,
+            matchedEdges,
+            missingNodes: pattern.nodes.length - matchedNodes,
+            missingEdges: pattern.edges.length - matchedEdges,
+            similarity: denominator ? Math.round((matchedWeight / denominator) * 100) : 0
+          };
+        });
+        return scored.sort((left, right) => right.similarity - left.similarity || right.matchedEdges - left.matchedEdges)[0];
+      }
+
+      function appendSolutionPreviewNode(svg, node) {
+        if (node.type === "start") {
+          svg.append(svgElement("circle", { class: "preview-node preview-start", cx: node.x, cy: node.y, r: 7 }));
+          return;
+        }
+        if (node.type === "end") {
+          svg.append(
+            svgElement("circle", { class: "preview-node", cx: node.x, cy: node.y, r: 8 }),
+            svgElement("circle", { class: "preview-end-inner", cx: node.x, cy: node.y, r: 4 })
+          );
+          return;
+        }
+        if (node.type === "decision") {
+          svg.append(svgElement("polygon", { class: "preview-node", points: `${node.x},${node.y - 12} ${node.x + 12},${node.y} ${node.x},${node.y + 12} ${node.x - 12},${node.y}` }));
+          return;
+        }
+        svg.append(svgElement("rect", { class: "preview-node", x: node.x - 28, y: node.y - 9, width: 56, height: 18, rx: 5 }));
+      }
+
+      function createSolutionPreview(pattern) {
+        const svg = svgElement("svg", { class: "solution-preview", viewBox: "0 0 300 190", role: "img", "aria-label": `Musterlösung ${pattern.name}` });
+        const markerId = `preview-arrow-${pattern.id}`;
+        const defs = svgElement("defs");
+        const marker = svgElement("marker", { id: markerId, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "6", markerHeight: "6", orient: "auto" });
+        marker.append(svgElement("path", { d: "M 1 1 L 9 5 L 1 9" }));
+        defs.append(marker);
+        svg.append(defs);
+        pattern.edges.forEach(([fromId, toId]) => {
+          const from = pattern.nodes.find((node) => node.id === fromId);
+          const to = pattern.nodes.find((node) => node.id === toId);
+          const curve = from.y >= to.y
+            ? `M ${from.x} ${from.y} C ${from.x - 62} ${from.y}, ${to.x - 62} ${to.y}, ${to.x} ${to.y}`
+            : `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
+          svg.append(svgElement("path", { d: curve, "marker-end": `url(#${markerId})` }));
+        });
+        pattern.nodes.forEach((node) => appendSolutionPreviewNode(svg, node));
+        return svg;
+      }
+
+      function applyEvaluationHighlights() {
+        if (!evaluation) return;
+        surface.querySelectorAll(".node").forEach((node) => {
+          const correct = evaluation.best.correctNodeIds.has(node.dataset.nodeId);
+          node.classList.add(correct ? "evaluation-correct" : "evaluation-wrong");
+        });
+        surface.querySelectorAll(".connection-group").forEach((group) => {
+          const edgeId = group.querySelector(".connection-hit")?.dataset.edgeId;
+          const correct = evaluation.best.correctEdgeIds.has(edgeId);
+          group.classList.add(correct ? "evaluation-correct" : "evaluation-wrong");
+        });
+      }
+
+      function renderEvaluationPanel() {
+        if (!evaluation) return;
+        const best = evaluation.best;
+        evaluationSummary.textContent = state.nodes.length
+          ? `Am ähnlichsten ist „${best.pattern.name}“ mit ${best.similarity} %. ${best.matchedNodes} von ${best.pattern.nodes.length} Elementen und ${best.matchedEdges} von ${best.pattern.edges.length} Verbindungen stimmen strukturell überein.`
+          : "Die Arbeitsfläche enthält noch keine auswertbaren Elemente. Unten siehst du alle zulässigen Musterlösungen.";
+        solutionList.replaceChildren();
+        evaluation.results.forEach((result) => {
+          const card = document.createElement("article");
+          card.className = `solution-card${result.pattern.id === best.pattern.id ? " closest" : ""}`;
+          const header = document.createElement("header");
+          header.className = "solution-card-header";
+          const title = document.createElement("h3");
+          title.textContent = result.pattern.name;
+          header.append(title);
+          if (result.pattern.id === best.pattern.id) {
+            const badge = document.createElement("span");
+            badge.className = "solution-badge";
+            badge.textContent = "ähnlichste";
+            header.append(badge);
+          }
+          const score = document.createElement("strong");
+          score.className = "solution-score";
+          score.textContent = `${result.similarity} %`;
+          header.append(score);
+          card.append(header, createSolutionPreview(result.pattern));
+          solutionList.append(card);
+        });
+        evaluationPanel.hidden = false;
+      }
+
+      function evaluateDiagram() {
+        const results = solutionPatterns.map(evaluatePattern);
+        const best = [...results].sort((left, right) => right.similarity - left.similarity || right.matchedEdges - left.matchedEdges)[0];
+        evaluation = { results, best };
+        render();
+        renderEvaluationPanel();
       }
 
       function cellCenter(row, column) {
@@ -1751,6 +2097,7 @@
         state.nodes.forEach((node) => surface.append(createNodeElement(node)));
         emptyState.hidden = state.nodes.length > 0 || state.swimlanes.length > 0;
         renderConnections();
+        applyEvaluationHighlights();
         applyZoom();
       }
 
@@ -1767,7 +2114,7 @@
         applyZoom();
         viewport.scrollLeft = x * (next / previous) - (event.clientX - rect.left);
         viewport.scrollTop = y * (next / previous) - (event.clientY - rect.top);
-        saveState();
+        saveState(true);
       }, { passive: false });
 
       surface.addEventListener("click", () => {
@@ -1814,6 +2161,8 @@
       resetButton.addEventListener("click", () => {
         if ((!state.nodes.length && !state.swimlanes.length) || window.confirm("Soll die gesamte Arbeitsfläche wirklich zurückgesetzt werden?")) {
           state = defaultState();
+          evaluation = null;
+          evaluationPanel.hidden = true;
           selectedNodeId = null;
           selectedSwimlaneId = null;
           selectedEdgeId = null;
@@ -1822,6 +2171,13 @@
           render();
           showToast("Die Arbeitsfläche wurde zurückgesetzt.");
         }
+      });
+
+      evaluateButton.addEventListener("click", evaluateDiagram);
+      evaluationClose.addEventListener("click", () => {
+        evaluation = null;
+        evaluationPanel.hidden = true;
+        render();
       });
 
       renderPalette();
