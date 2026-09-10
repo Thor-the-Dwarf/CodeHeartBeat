@@ -1,0 +1,1220 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UML-Aufgabenblatt – Aktivitätsdiagramm</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --page: #08070d;
+      --panel: #0d1118;
+      --panel-soft: #110d18;
+      --grid: rgba(199, 125, 255, 0.17);
+      --purple: #c77dff;
+      --purple-soft: #8e5aaa;
+      --text: #ece8f2;
+      --muted: #92879f;
+      --line: #d8deea;
+      --cyan: #58dff7;
+      --yellow: #e7bd55;
+      --cell-w: 180px;
+      --cell-h: 130px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { width: 100%; height: 100%; margin: 0; }
+
+    body {
+      min-width: 1080px;
+      overflow: hidden;
+      color: var(--text);
+      background: var(--page);
+      font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+    }
+
+    button, input { font: inherit; }
+
+    .app {
+      display: grid;
+      grid-template-rows: 58px minmax(0, 1fr);
+      width: 100%;
+      height: 100%;
+    }
+
+    .appbar {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 0 18px;
+      border-bottom: 1px solid rgba(199, 125, 255, 0.28);
+      background: #0c0912;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.42);
+    }
+
+    .appbar h1 {
+      margin: 0;
+      font-size: 16px;
+      letter-spacing: 0.12em;
+      white-space: nowrap;
+    }
+
+    .diagram-kind,
+    .prototype-badge {
+      padding: 8px 12px;
+      border: 1px solid rgba(199, 125, 255, 0.32);
+      border-radius: 5px;
+      color: #d8cde3;
+      background: rgba(199, 125, 255, 0.07);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+    }
+
+    .prototype-badge {
+      margin-left: auto;
+      color: #e9c978;
+      border-color: rgba(231, 189, 85, 0.38);
+      background: rgba(231, 189, 85, 0.07);
+    }
+
+    .reset-button {
+      padding: 8px 12px;
+      border: 1px solid rgba(255, 116, 151, 0.38);
+      border-radius: 5px;
+      color: #ff9ab3;
+      background: rgba(255, 116, 151, 0.07);
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .reset-button:hover,
+    .reset-button:focus-visible {
+      border-color: #ff9ab3;
+      outline: none;
+      background: rgba(255, 116, 151, 0.14);
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(360px, 42%) minmax(620px, 58%);
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .task-pane {
+      min-width: 0;
+      min-height: 0;
+      overflow: auto;
+      padding: clamp(28px, 4vw, 64px);
+      border-right: 1px solid rgba(199, 125, 255, 0.23);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(88, 223, 247, 0.05), transparent 30%),
+        #0a0e14;
+    }
+
+    .task-sheet { max-width: 720px; margin: 0 auto; }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: #63d9a4;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .task-sheet h2 {
+      max-width: 650px;
+      margin: 0 0 16px;
+      font-size: clamp(24px, 2.4vw, 38px);
+      line-height: 1.12;
+    }
+
+    .lead {
+      margin: 0 0 34px;
+      color: #b9c4d2;
+      font: 500 14px/1.8 system-ui, sans-serif;
+    }
+
+    .task-section {
+      margin-top: 28px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(122, 148, 177, 0.2);
+    }
+
+    .task-section h3 {
+      margin: 0 0 12px;
+      color: #dce7f5;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .task-section p,
+    .task-section li {
+      color: #aeb9c7;
+      font: 500 13px/1.75 system-ui, sans-serif;
+    }
+
+    .task-section ol,
+    .task-section ul { margin: 0; padding-left: 22px; }
+    .task-section li + li { margin-top: 8px; }
+
+    .data-sample {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px 22px;
+      margin-top: 16px;
+      padding: 18px 20px;
+      border: 1px solid rgba(88, 223, 247, 0.24);
+      border-radius: 7px;
+      background: rgba(88, 223, 247, 0.04);
+      font-size: 11px;
+    }
+
+    .data-sample strong { color: #7be2f5; }
+    .data-sample span { color: #cad4df; }
+
+    .hint {
+      margin-top: 28px;
+      padding: 14px 16px;
+      border-left: 3px solid var(--yellow);
+      color: #c3b98f;
+      background: rgba(231, 189, 85, 0.06);
+      font: 600 11px/1.6 system-ui, sans-serif;
+    }
+
+    .editor-pane {
+      display: grid;
+      grid-template-rows: 34px 154px minmax(0, 1fr);
+      min-width: 0;
+      min-height: 0;
+      background: var(--panel-soft);
+    }
+
+    .instruction {
+      display: flex;
+      align-items: center;
+      padding: 0 17px;
+      overflow: hidden;
+      color: #8d7a99;
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      white-space: nowrap;
+    }
+
+    .palette-viewport {
+      min-width: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+      border-bottom: 1px solid rgba(199, 125, 255, 0.24);
+      scrollbar-color: #573b68 transparent;
+    }
+
+    .palette {
+      display: flex;
+      align-items: center;
+      gap: 38px;
+      width: max-content;
+      min-width: 100%;
+      height: 100%;
+      padding: 20px 42px;
+    }
+
+    .tool {
+      position: relative;
+      display: grid;
+      flex: 0 0 auto;
+      place-items: center;
+      min-width: 92px;
+      min-height: 84px;
+      padding: 0;
+      border: 0;
+      color: inherit;
+      background: transparent;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .tool:active { cursor: grabbing; }
+    .tool:hover .shape { filter: drop-shadow(0 0 9px rgba(199, 125, 255, 0.42)); }
+
+    .tool::after {
+      position: absolute;
+      top: calc(50% + 34px);
+      left: 50%;
+      color: #cec4d7;
+      content: attr(data-name);
+      font-size: 8px;
+      font-weight: 800;
+      white-space: nowrap;
+      transform: translateX(-50%);
+    }
+
+    .tool[data-tooltip]:hover::before {
+      position: fixed;
+      z-index: 80;
+      max-width: 220px;
+      padding: 8px 10px;
+      border: 1px solid rgba(199, 125, 255, 0.5);
+      border-radius: 5px;
+      color: #e8e1ee;
+      content: attr(data-tooltip);
+      background: #17101f;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      font: 600 9px/1.45 system-ui, sans-serif;
+      pointer-events: none;
+      transform: translate(56px, -48px);
+    }
+
+    .shape {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 138px;
+      height: 62px;
+      border: 1px solid #8ba7bd;
+      border-radius: 22px;
+      color: #eef3f8;
+      background: #182634;
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1.25;
+      text-align: center;
+      transition: filter 130ms ease, border-color 130ms ease;
+    }
+
+    .shape.start,
+    .shape.end {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      color: transparent;
+      background: #9bd0e4;
+    }
+
+    .shape.end {
+      border: 5px double #dce7f2;
+      background: #080c12;
+    }
+
+    .shape.decision,
+    .shape.merge {
+      width: 76px;
+      height: 76px;
+      border-color: #c7a751;
+      border-radius: 0;
+      color: #ffe8a8;
+      background: rgba(105, 79, 24, 0.42);
+      transform: rotate(45deg);
+    }
+
+    .shape.decision > span,
+    .shape.merge > span { transform: rotate(-45deg); }
+
+    .shape.fork,
+    .shape.join {
+      width: 136px;
+      height: 12px;
+      border-radius: 3px;
+      border-color: #c9d4e3;
+      background: #c9d4e3;
+      color: transparent;
+    }
+
+    .canvas-viewport {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+      overflow: auto;
+      scrollbar-color: #573b68 #0a0810;
+      background: #0b0811;
+    }
+
+    .zoom-layer { position: relative; width: 1620px; height: 1300px; }
+
+    .surface {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1620px;
+      height: 1300px;
+      overflow: hidden;
+      background-color: #0c0912;
+      background-image:
+        linear-gradient(to right, var(--grid) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+      background-size: var(--cell-w) var(--cell-h);
+      transform-origin: 0 0;
+    }
+
+    .surface.connecting { cursor: crosshair; }
+
+    .empty-state {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      display: grid;
+      gap: 7px;
+      color: #6d5d77;
+      text-align: center;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+    }
+
+    .empty-state strong { font-size: 11px; }
+    .empty-state span { font: 500 8px/1.5 system-ui, sans-serif; }
+    .empty-state[hidden] { display: none; }
+
+    .connections {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    .connection-line {
+      fill: none;
+      stroke: var(--line);
+      stroke-width: 2;
+      stroke-linecap: square;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+
+    .connection-hit {
+      fill: none;
+      stroke: rgba(0, 0, 0, 0.001);
+      stroke-width: 16;
+      cursor: text;
+      pointer-events: stroke;
+    }
+
+    .connection-hit:hover + .connection-line,
+    .connection-group.selected .connection-line {
+      stroke: var(--cyan);
+      filter: drop-shadow(0 0 5px rgba(88, 223, 247, 0.55));
+    }
+
+    .connection-label {
+      fill: #f1c85f;
+      stroke: #0c0912;
+      stroke-width: 4px;
+      paint-order: stroke;
+      font-size: 10px;
+      font-weight: 900;
+      text-anchor: middle;
+      pointer-events: none;
+    }
+
+    .edge-editor {
+      position: absolute;
+      z-index: 30;
+      width: 150px;
+      padding: 7px 9px;
+      border: 1px solid var(--purple);
+      border-radius: 5px;
+      color: #f5cf6f;
+      background: #120d18;
+      outline: none;
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+      font-size: 10px;
+      font-weight: 800;
+      text-align: center;
+      transform: translate(-50%, -50%);
+    }
+
+    .edge-handle {
+      position: absolute;
+      z-index: 9;
+      width: 72px;
+      height: 28px;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      background: transparent;
+      cursor: text;
+      transform: translate(-50%, -50%);
+    }
+
+    .edge-handle:hover,
+    .edge-handle:focus-visible {
+      border-color: rgba(88, 223, 247, 0.34);
+      outline: none;
+      background: rgba(88, 223, 247, 0.05);
+    }
+
+    .node {
+      position: absolute;
+      z-index: 4;
+      display: grid;
+      place-items: center;
+      transform: translate(-50%, -50%);
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .node.dragging { z-index: 20; cursor: grabbing; opacity: 0.86; }
+    .node.selected .shape { border-color: var(--purple); filter: drop-shadow(0 0 9px rgba(199, 125, 255, 0.42)); }
+    .node .shape { pointer-events: none; }
+
+    .node-label {
+      display: block;
+      max-width: 124px;
+      padding: 4px;
+      overflow-wrap: anywhere;
+      pointer-events: none;
+    }
+
+    .node-editor {
+      width: 122px;
+      min-height: 36px;
+      padding: 6px;
+      border: 1px solid var(--purple);
+      border-radius: 4px;
+      color: #fff;
+      background: #0c1119;
+      outline: none;
+      font-size: 10px;
+      font-weight: 800;
+      text-align: center;
+      transform: none !important;
+    }
+
+    .port {
+      position: absolute;
+      z-index: 8;
+      display: grid;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: 1px solid #b56fdd;
+      border-radius: 50%;
+      color: #fff;
+      background: #2b1237;
+      cursor: crosshair;
+      opacity: 0;
+      place-items: center;
+      pointer-events: none;
+      transition: opacity 120ms ease, transform 120ms ease;
+    }
+
+    .port::before { content: "›"; font-size: 15px; font-weight: 900; }
+    .node:hover .port, .node.selected .port, .surface.connecting .port { opacity: 1; pointer-events: auto; }
+    .port:hover { transform: scale(1.15); }
+    .port.top { top: -18px; left: 50%; margin-left: -12px; transform: rotate(-90deg); }
+    .port.right { top: 50%; right: -18px; margin-top: -12px; }
+    .port.bottom { bottom: -18px; left: 50%; margin-left: -12px; transform: rotate(90deg); }
+    .port.left { top: 50%; left: -18px; margin-top: -12px; transform: rotate(180deg); }
+    .port.top:hover { transform: rotate(-90deg) scale(1.15); }
+    .port.bottom:hover { transform: rotate(90deg) scale(1.15); }
+    .port.left:hover { transform: rotate(180deg) scale(1.15); }
+    .port.active { color: #15101a; border-color: #f1c85f; background: #f1c85f; opacity: 1; }
+
+    .drag-ghost {
+      position: fixed;
+      z-index: 100;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+      transform: translate(-50%, -50%) scale(0.9);
+      filter: drop-shadow(0 12px 16px rgba(0, 0, 0, 0.5));
+    }
+
+    .trash {
+      position: fixed;
+      z-index: 90;
+      top: 68px;
+      right: 18px;
+      display: none;
+      width: 180px;
+      height: 68px;
+      border: 1px solid #ff6c91;
+      border-radius: 7px;
+      color: #ffdbe4;
+      background: rgba(103, 15, 41, 0.96);
+      font-size: 10px;
+      font-weight: 900;
+      place-items: center;
+      pointer-events: none;
+    }
+
+    .trash.visible { display: grid; }
+    .trash.over { color: #fff; background: #a41e47; transform: scale(1.03); }
+
+    .toast {
+      position: fixed;
+      z-index: 120;
+      right: 22px;
+      bottom: 22px;
+      display: none;
+      max-width: 340px;
+      padding: 12px 16px;
+      border: 1px solid rgba(99, 217, 164, 0.42);
+      border-radius: 6px;
+      color: #baf1d7;
+      background: #102019;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+      font: 700 10px/1.5 system-ui, sans-serif;
+    }
+
+    .toast.visible { display: block; animation: toast-in 180ms ease-out; }
+
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media print {
+      body { min-width: 0; overflow: visible; background: #fff; color: #111; }
+      .app { display: block; }
+      .appbar, .editor-pane { display: none; }
+      .workspace { display: block; }
+      .task-pane { overflow: visible; border: 0; background: #fff; }
+      .task-section p, .task-section li, .lead { color: #222; }
+      .task-sheet h2, .task-section h3 { color: #111; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="appbar">
+      <h1>UML-AUFGABENBLATT</h1>
+      <span class="diagram-kind">Aktivitätsdiagramm</span>
+      <span class="prototype-badge">Prototyp ohne Auswertung</span>
+      <button class="reset-button" id="resetButton" type="button">Arbeitsfläche zurücksetzen</button>
+    </header>
+
+    <div class="workspace">
+      <section class="task-pane" aria-labelledby="taskTitle">
+        <article class="task-sheet">
+          <p class="eyebrow">Modellierungsaufgabe · UML</p>
+          <h2 id="taskTitle">CSV-Daten für eine Bestenliste verarbeiten</h2>
+          <p class="lead">Eine Berufsschule möchte die Ergebnisse eines Programmierwettbewerbs automatisiert aus einer CSV-Datei einlesen und für die Veröffentlichung aufbereiten.</p>
+
+          <section class="task-section">
+            <h3>Ausgangssituation</h3>
+            <p>Die erste Zeile der Datei enthält die Spaltenüberschriften. Jede weitere Zeile enthält den Namen einer teilnehmenden Person und die erreichte Punktzahl. Beide Werte sind durch ein Semikolon getrennt.</p>
+            <div class="data-sample" aria-label="Beispieldaten">
+              <strong>Name</strong><strong>Punkte</strong>
+              <span>Ada</span><span>95</span>
+              <span>Linus</span><span>88</span>
+            </div>
+          </section>
+
+          <section class="task-section">
+            <h3>Arbeitsauftrag</h3>
+            <p>Übertragen Sie den beschriebenen Ablauf auf der rechten Seite in ein Aktivitätsdiagramm.</p>
+            <ol>
+              <li>Stellen Sie den Start und das Ende der Verarbeitung dar.</li>
+              <li>Lesen Sie die CSV-Daten ein und überspringen Sie die Kopfzeile.</li>
+              <li>Prüfen Sie wiederholt, ob eine weitere Datenzeile vorhanden ist.</li>
+              <li>Zerlegen Sie jede Datenzeile in Name und Punktzahl.</li>
+              <li>Geben Sie für jede Person eine formatierte Ergebniszeile aus.</li>
+              <li>Beschriften Sie die ausgehenden Kontrollflüsse einer Entscheidung eindeutig.</li>
+            </ol>
+          </section>
+
+          <section class="task-section">
+            <h3>Bedienung</h3>
+            <ul>
+              <li>Baustein oben halten und in das Raster ziehen.</li>
+              <li>Elemente durch Ziehen neu positionieren.</li>
+              <li>Beschriftungen durch Doppelklick bearbeiten.</li>
+              <li>Am Rand eines Elements einen Anschluss wählen und danach das Zielelement anklicken.</li>
+              <li>Pfeilbeschriftungen durch Doppelklick bearbeiten.</li>
+              <li>Mit Strg beziehungsweise Cmd und Mausrad zoomen.</li>
+            </ul>
+          </section>
+
+          <p class="hint">Die Arbeitsfläche wird automatisch in diesem Browser gespeichert. Eine fachliche Auswertung ist in diesem Prototyp noch nicht enthalten.</p>
+        </article>
+      </section>
+
+      <section class="editor-pane" aria-label="Zeichenbereich für das Aktivitätsdiagramm">
+        <div class="instruction">Übertrage die Aufgabenstellung auf der linken Seite in ein Aktivitätsdiagramm</div>
+        <div class="palette-viewport">
+          <div class="palette" id="palette" aria-label="Bausteine"></div>
+        </div>
+        <div class="canvas-viewport" id="viewport">
+          <div class="zoom-layer" id="zoomLayer">
+            <div class="surface" id="surface">
+              <svg class="connections" id="connections" aria-label="Verbindungen"></svg>
+              <div class="empty-state" id="emptyState">
+                <strong>Baustein aufnehmen</strong>
+                <span>Halte oben ein Element und ziehe es in dieses Raster.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div class="trash" id="trash">⌫ Element löschen</div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const CELL_WIDTH = 180;
+      const CELL_HEIGHT = 130;
+      const SURFACE_WIDTH = 1620;
+      const SURFACE_HEIGHT = 1300;
+      const STORAGE_KEY = "codeheartbeat-uml-worksheet-activity-v1";
+      const EDITABLE_TYPES = new Set(["action", "decision", "merge"]);
+      const tools = [
+        { type: "start", name: "Start", label: "", tooltip: "Beginn des dargestellten Ablaufs." },
+        { type: "action", name: "Aktion", label: "Aktion", tooltip: "Ein einzelner Verarbeitungsschritt oder eine Tätigkeit." },
+        { type: "decision", name: "Entscheidung", label: "Bedingung", tooltip: "Verzweigt den Kontrollfluss anhand einer Bedingung." },
+        { type: "merge", name: "Zusammenführung", label: "", tooltip: "Führt alternative Kontrollflüsse wieder zusammen." },
+        { type: "fork", name: "Fork", label: "", tooltip: "Teilt einen Kontrollfluss in parallel ablaufende Zweige." },
+        { type: "join", name: "Join", label: "", tooltip: "Synchronisiert mehrere parallele Kontrollflüsse." },
+        { type: "end", name: "Ende", label: "", tooltip: "Beendet den gesamten dargestellten Ablauf." }
+      ];
+
+      const dimensions = {
+        start: { width: 40, height: 40 },
+        action: { width: 138, height: 62 },
+        decision: { width: 108, height: 108 },
+        merge: { width: 108, height: 108 },
+        fork: { width: 136, height: 12 },
+        join: { width: 136, height: 12 },
+        end: { width: 40, height: 40 }
+      };
+
+      const palette = document.getElementById("palette");
+      const viewport = document.getElementById("viewport");
+      const zoomLayer = document.getElementById("zoomLayer");
+      const surface = document.getElementById("surface");
+      const connectionsSvg = document.getElementById("connections");
+      const emptyState = document.getElementById("emptyState");
+      const trash = document.getElementById("trash");
+      const toast = document.getElementById("toast");
+      const resetButton = document.getElementById("resetButton");
+
+      let state = loadState();
+      let selectedNodeId = null;
+      let selectedEdgeId = null;
+      let connectionSource = null;
+      let drag = null;
+      let toastTimer = null;
+
+      function createShape(type, label = "") {
+        const shape = document.createElement("div");
+        shape.className = `shape ${type}`;
+        const text = document.createElement("span");
+        text.className = "node-label";
+        text.textContent = label;
+        shape.append(text);
+        return shape;
+      }
+
+      function renderPalette() {
+        tools.forEach((tool) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "tool";
+          button.dataset.name = tool.name;
+          button.dataset.tooltip = tool.tooltip;
+          button.setAttribute("aria-label", `${tool.name} in das Raster ziehen`);
+          button.append(createShape(tool.type, tool.label));
+          button.addEventListener("pointerdown", (event) => beginPaletteDrag(event, tool));
+          palette.append(button);
+        });
+      }
+
+      function defaultState() {
+        return { zoom: 1, nextNodeId: 0, nextEdgeId: 0, nodes: [], edges: [] };
+      }
+
+      function loadState() {
+        try {
+          const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
+          if (stored && Array.isArray(stored.nodes) && Array.isArray(stored.edges)) return { ...defaultState(), ...stored };
+        } catch (_) {}
+        return defaultState();
+      }
+
+      function saveState() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      }
+
+      function showToast(message) {
+        clearTimeout(toastTimer);
+        toast.textContent = message;
+        toast.classList.add("visible");
+        toastTimer = setTimeout(() => toast.classList.remove("visible"), 2400);
+      }
+
+      function cellCenter(row, column) {
+        return { x: column * CELL_WIDTH + CELL_WIDTH / 2, y: row * CELL_HEIGHT + CELL_HEIGHT / 2 };
+      }
+
+      function cellFromClient(clientX, clientY) {
+        const rect = surface.getBoundingClientRect();
+        const x = (clientX - rect.left) / state.zoom;
+        const y = (clientY - rect.top) / state.zoom;
+        return {
+          row: Math.max(0, Math.min(Math.floor(SURFACE_HEIGHT / CELL_HEIGHT) - 1, Math.floor(y / CELL_HEIGHT))),
+          column: Math.max(0, Math.min(Math.floor(SURFACE_WIDTH / CELL_WIDTH) - 1, Math.floor(x / CELL_WIDTH)))
+        };
+      }
+
+      function isPointInside(element, clientX, clientY) {
+        const rect = element.getBoundingClientRect();
+        return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+      }
+
+      function cellAvailable(row, column, ignoredId = null) {
+        return !state.nodes.some((node) => node.id !== ignoredId && node.row === row && node.column === column);
+      }
+
+      function beginPaletteDrag(event, tool) {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        const ghost = document.createElement("div");
+        ghost.className = "drag-ghost";
+        ghost.append(createShape(tool.type, tool.label));
+        document.body.append(ghost);
+        drag = { kind: "new", tool, ghost, moved: false, startX: event.clientX, startY: event.clientY };
+        moveGhost(event.clientX, event.clientY);
+      }
+
+      function beginNodeDrag(event, node) {
+        if (event.button !== 0 || event.target.closest(".port") || event.target.closest(".node-editor")) return;
+        event.preventDefault();
+        selectedNodeId = node.id;
+        selectedEdgeId = null;
+        drag = {
+          kind: "existing",
+          node,
+          element: event.currentTarget,
+          originalRow: node.row,
+          originalColumn: node.column,
+          startX: event.clientX,
+          startY: event.clientY,
+          moved: false
+        };
+        event.currentTarget.classList.add("dragging");
+        trash.classList.add("visible");
+        renderSelection();
+      }
+
+      function moveGhost(clientX, clientY) {
+        if (!drag?.ghost) return;
+        drag.ghost.style.left = `${clientX}px`;
+        drag.ghost.style.top = `${clientY}px`;
+      }
+
+      function handlePointerMove(event) {
+        if (!drag) return;
+        const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+        if (distance > 5) drag.moved = true;
+        if (drag.kind === "new") {
+          moveGhost(event.clientX, event.clientY);
+          return;
+        }
+        if (!drag.moved) return;
+        const rect = surface.getBoundingClientRect();
+        drag.element.style.left = `${(event.clientX - rect.left) / state.zoom}px`;
+        drag.element.style.top = `${(event.clientY - rect.top) / state.zoom}px`;
+        trash.classList.toggle("over", isPointInside(trash, event.clientX, event.clientY));
+      }
+
+      function finishDrag(event) {
+        if (!drag) return;
+        if (drag.kind === "new") {
+          drag.ghost.remove();
+          if (isPointInside(viewport, event.clientX, event.clientY)) {
+            const cell = cellFromClient(event.clientX, event.clientY);
+            if (cellAvailable(cell.row, cell.column)) {
+              state.nodes.push({
+                id: `n${++state.nextNodeId}`,
+                type: drag.tool.type,
+                label: drag.tool.label,
+                row: cell.row,
+                column: cell.column
+              });
+              selectedNodeId = state.nodes.at(-1).id;
+              saveState();
+              render();
+            } else showToast("Dieses Rasterfeld ist bereits belegt.");
+          }
+        } else {
+          const droppedOnTrash = drag.moved && isPointInside(trash, event.clientX, event.clientY);
+          trash.classList.remove("visible", "over");
+          drag.element.classList.remove("dragging");
+          if (!drag.moved) {
+            drag = null;
+            return;
+          }
+          if (droppedOnTrash) {
+            if (window.confirm("Soll dieses Element mit seinen Verbindungen wirklich gelöscht werden?")) {
+              state.nodes = state.nodes.filter((node) => node.id !== drag.node.id);
+              state.edges = state.edges.filter((edge) => edge.from !== drag.node.id && edge.to !== drag.node.id);
+              selectedNodeId = null;
+              saveState();
+              render();
+            } else render();
+          } else if (drag.moved && isPointInside(viewport, event.clientX, event.clientY)) {
+            const cell = cellFromClient(event.clientX, event.clientY);
+            if (cellAvailable(cell.row, cell.column, drag.node.id)) {
+              drag.node.row = cell.row;
+              drag.node.column = cell.column;
+              saveState();
+            } else showToast("Dieses Rasterfeld ist bereits belegt.");
+            render();
+          } else render();
+        }
+        drag = null;
+      }
+
+      function portPoint(node, side) {
+        const center = cellCenter(node.row, node.column);
+        const size = dimensions[node.type];
+        const halfWidth = size.width / 2;
+        const halfHeight = size.height / 2;
+        if (side === "top") return { x: center.x, y: center.y - halfHeight };
+        if (side === "bottom") return { x: center.x, y: center.y + halfHeight };
+        if (side === "left") return { x: center.x - halfWidth, y: center.y };
+        return { x: center.x + halfWidth, y: center.y };
+      }
+
+      function bestTargetSide(source, target) {
+        const dx = target.column - source.column;
+        const dy = target.row - source.row;
+        if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? "left" : "right";
+        return dy > 0 ? "top" : "bottom";
+      }
+
+      function routeFor(edge) {
+        const source = state.nodes.find((node) => node.id === edge.from);
+        const target = state.nodes.find((node) => node.id === edge.to);
+        if (!source || !target) return null;
+        const start = portPoint(source, edge.side);
+        const targetSide = bestTargetSide(source, target);
+        const end = portPoint(target, targetSide);
+
+        if (source.id === target.id) {
+          const offset = 52;
+          return [start, { x: start.x + offset, y: start.y }, { x: start.x + offset, y: start.y + offset }, { x: end.x, y: start.y + offset }, end];
+        }
+
+        if (["left", "right"].includes(edge.side)) {
+          const outward = edge.side === "right" ? 28 : -28;
+          const first = { x: start.x + outward, y: start.y };
+          return [start, first, { x: first.x, y: end.y }, end];
+        }
+        const outward = edge.side === "bottom" ? 28 : -28;
+        const first = { x: start.x, y: start.y + outward };
+        return [start, first, { x: end.x, y: first.y }, end];
+      }
+
+      function pathData(points) {
+        return points.map((point, index) => `${index ? "L" : "M"} ${point.x} ${point.y}`).join(" ");
+      }
+
+      function routeMiddle(points) {
+        const segments = points.slice(1).map((point, index) => {
+          const previous = points[index];
+          return { from: previous, to: point, length: Math.abs(point.x - previous.x) + Math.abs(point.y - previous.y) };
+        });
+        const total = segments.reduce((sum, segment) => sum + segment.length, 0);
+        let remaining = total / 2;
+        for (const segment of segments) {
+          if (remaining <= segment.length) {
+            const ratio = segment.length ? remaining / segment.length : 0;
+            return {
+              x: segment.from.x + (segment.to.x - segment.from.x) * ratio,
+              y: segment.from.y + (segment.to.y - segment.from.y) * ratio
+            };
+          }
+          remaining -= segment.length;
+        }
+        return points[0];
+      }
+
+      function svgElement(name, attributes = {}) {
+        const element = document.createElementNS("http://www.w3.org/2000/svg", name);
+        Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, value));
+        return element;
+      }
+
+      function editEdge(edge, route) {
+        surface.querySelector(".edge-editor")?.remove();
+        const middle = routeMiddle(route);
+        const input = document.createElement("input");
+        input.className = "edge-editor";
+        input.value = edge.label || "";
+        input.placeholder = "Pfeil beschriften";
+        input.setAttribute("aria-label", "Kontrollfluss beschriften");
+        input.style.left = `${middle.x}px`;
+        input.style.top = `${middle.y}px`;
+        ["pointerdown", "click", "dblclick"].forEach((eventName) => input.addEventListener(eventName, (event) => event.stopPropagation()));
+        surface.append(input);
+        input.focus();
+        input.select();
+        let finished = false;
+        const finish = (save) => {
+          if (finished || !input.isConnected) return;
+          finished = true;
+          if (save) edge.label = input.value.trim();
+          saveState();
+          render();
+        };
+        input.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") finish(true);
+          if (event.key === "Escape") finish(false);
+        });
+        input.addEventListener("blur", () => finish(true));
+      }
+
+      function renderConnections() {
+        connectionsSvg.replaceChildren();
+        const defs = svgElement("defs");
+        const marker = svgElement("marker", { id: "openArrow", viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "8", markerHeight: "8", orient: "auto-start-reverse" });
+        marker.append(svgElement("path", { d: "M 1 1 L 9 5 L 1 9", fill: "none", stroke: "#d8deea", "stroke-width": "1.6" }));
+        defs.append(marker);
+        connectionsSvg.append(defs);
+
+        state.edges.forEach((edge) => {
+          const route = routeFor(edge);
+          if (!route) return;
+          const group = svgElement("g", { class: `connection-group${selectedEdgeId === edge.id ? " selected" : ""}` });
+          const d = pathData(route);
+          const hit = svgElement("path", {
+            class: "connection-hit",
+            d
+          });
+          hit.dataset.edgeId = edge.id;
+          const line = svgElement("path", { class: "connection-line", d, "marker-end": "url(#openArrow)" });
+          hit.addEventListener("click", (event) => {
+            event.stopPropagation();
+            selectedNodeId = null;
+            selectedEdgeId = edge.id;
+            renderSelection();
+          });
+          hit.addEventListener("dblclick", (event) => {
+            event.stopPropagation();
+            editEdge(edge, route);
+          });
+          hit.addEventListener("keydown", (event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            event.stopPropagation();
+            editEdge(edge, route);
+          });
+          group.append(hit, line);
+          if (edge.label) {
+            const middle = routeMiddle(route);
+            const label = svgElement("text", { class: "connection-label", x: middle.x, y: middle.y - 8 });
+            label.textContent = edge.label;
+            group.append(label);
+          }
+          connectionsSvg.append(group);
+
+          const middle = routeMiddle(route);
+          const editHandle = document.createElement("button");
+          editHandle.type = "button";
+          editHandle.className = "edge-handle";
+          editHandle.setAttribute("aria-label", "Kontrollfluss bearbeiten");
+          editHandle.style.left = `${middle.x}px`;
+          editHandle.style.top = `${middle.y}px`;
+          editHandle.addEventListener("click", (event) => {
+            event.stopPropagation();
+            selectedNodeId = null;
+            selectedEdgeId = edge.id;
+            renderSelection();
+          });
+          editHandle.addEventListener("dblclick", (event) => {
+            event.stopPropagation();
+            editEdge(edge, route);
+          });
+          editHandle.addEventListener("keydown", (event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            event.stopPropagation();
+            editEdge(edge, route);
+          });
+          surface.append(editHandle);
+        });
+      }
+
+      function beginConnection(event, node, side, button) {
+        event.preventDefault();
+        event.stopPropagation();
+        connectionSource = { nodeId: node.id, side };
+        selectedNodeId = node.id;
+        selectedEdgeId = null;
+        surface.classList.add("connecting");
+        surface.querySelectorAll(".port").forEach((port) => port.classList.remove("active"));
+        button.classList.add("active");
+        showToast("Wähle jetzt das Zielelement.");
+      }
+
+      function finishConnection(targetNode) {
+        if (!connectionSource) return false;
+        state.edges.push({
+          id: `e${++state.nextEdgeId}`,
+          from: connectionSource.nodeId,
+          to: targetNode.id,
+          side: connectionSource.side,
+          label: ""
+        });
+        connectionSource = null;
+        surface.classList.remove("connecting");
+        saveState();
+        render();
+        return true;
+      }
+
+      function editNode(node, element) {
+        if (!EDITABLE_TYPES.has(node.type)) return;
+        const label = element.querySelector(".node-label");
+        const input = document.createElement("input");
+        input.className = "node-editor";
+        input.value = node.label;
+        input.setAttribute("aria-label", "Element beschriften");
+        label.replaceWith(input);
+        input.focus();
+        input.select();
+        let finished = false;
+        const finish = (save) => {
+          if (finished || !input.isConnected) return;
+          finished = true;
+          if (save) node.label = input.value.trim();
+          saveState();
+          render();
+        };
+        input.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") finish(true);
+          if (event.key === "Escape") finish(false);
+        });
+        input.addEventListener("blur", () => finish(true));
+      }
+
+      function createNodeElement(node) {
+        const center = cellCenter(node.row, node.column);
+        const element = document.createElement("div");
+        element.className = `node${selectedNodeId === node.id ? " selected" : ""}`;
+        element.dataset.nodeId = node.id;
+        element.style.left = `${center.x}px`;
+        element.style.top = `${center.y}px`;
+        element.append(createShape(node.type, node.label));
+        ["top", "right", "bottom", "left"].forEach((side) => {
+          if (["fork", "join"].includes(node.type) && ["left", "right"].includes(side)) return;
+          const port = document.createElement("button");
+          port.type = "button";
+          port.className = `port ${side}`;
+          port.setAttribute("aria-label", `Verbindung ${side} beginnen`);
+          port.addEventListener("pointerdown", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          });
+          port.addEventListener("click", (event) => {
+            beginConnection(event, node, side, port);
+          });
+          element.append(port);
+        });
+        element.addEventListener("pointerdown", (event) => beginNodeDrag(event, node));
+        element.addEventListener("click", (event) => {
+          event.stopPropagation();
+          if (finishConnection(node)) return;
+          selectedNodeId = node.id;
+          selectedEdgeId = null;
+          renderSelection();
+        });
+        element.addEventListener("dblclick", (event) => {
+          event.stopPropagation();
+          editNode(node, element);
+        });
+        return element;
+      }
+
+      function renderSelection() {
+        surface.querySelectorAll(".node").forEach((element) => element.classList.toggle("selected", element.dataset.nodeId === selectedNodeId));
+        surface.querySelectorAll(".connection-group").forEach((element) => element.classList.toggle("selected", element.querySelector(".connection-hit")?.dataset.edgeId === selectedEdgeId));
+      }
+
+      function applyZoom() {
+        surface.style.transform = `scale(${state.zoom})`;
+        zoomLayer.style.width = `${SURFACE_WIDTH * state.zoom}px`;
+        zoomLayer.style.height = `${SURFACE_HEIGHT * state.zoom}px`;
+      }
+
+      function render() {
+        surface.querySelectorAll(".node").forEach((node) => node.remove());
+        surface.querySelectorAll(".edge-handle, .edge-editor").forEach((element) => element.remove());
+        state.nodes.forEach((node) => surface.append(createNodeElement(node)));
+        emptyState.hidden = state.nodes.length > 0;
+        renderConnections();
+        applyZoom();
+      }
+
+      viewport.addEventListener("wheel", (event) => {
+        if ((!event.ctrlKey && !event.metaKey) || event.deltaY === 0) return;
+        event.preventDefault();
+        const previous = state.zoom;
+        const next = Math.max(0.45, Math.min(2.2, Number((previous + (event.deltaY < 0 ? 0.1 : -0.1)).toFixed(2))));
+        if (next === previous) return;
+        const rect = viewport.getBoundingClientRect();
+        const x = viewport.scrollLeft + event.clientX - rect.left;
+        const y = viewport.scrollTop + event.clientY - rect.top;
+        state.zoom = next;
+        applyZoom();
+        viewport.scrollLeft = x * (next / previous) - (event.clientX - rect.left);
+        viewport.scrollTop = y * (next / previous) - (event.clientY - rect.top);
+        saveState();
+      }, { passive: false });
+
+      surface.addEventListener("click", () => {
+        connectionSource = null;
+        selectedNodeId = null;
+        selectedEdgeId = null;
+        surface.classList.remove("connecting");
+        renderSelection();
+      });
+
+      document.addEventListener("pointermove", handlePointerMove);
+      document.addEventListener("pointerup", finishDrag);
+      document.addEventListener("keydown", (event) => {
+        if (!["Delete", "Backspace"].includes(event.key) || event.target.matches("input")) return;
+        if (selectedNodeId) {
+          state.nodes = state.nodes.filter((node) => node.id !== selectedNodeId);
+          state.edges = state.edges.filter((edge) => edge.from !== selectedNodeId && edge.to !== selectedNodeId);
+          selectedNodeId = null;
+        } else if (selectedEdgeId) {
+          state.edges = state.edges.filter((edge) => edge.id !== selectedEdgeId);
+          selectedEdgeId = null;
+        } else return;
+        event.preventDefault();
+        saveState();
+        render();
+      });
+
+      resetButton.addEventListener("click", () => {
+        if (!state.nodes.length || window.confirm("Soll die gesamte Arbeitsfläche wirklich zurückgesetzt werden?")) {
+          state = defaultState();
+          selectedNodeId = null;
+          selectedEdgeId = null;
+          connectionSource = null;
+          localStorage.removeItem(STORAGE_KEY);
+          render();
+          showToast("Die Arbeitsfläche wurde zurückgesetzt.");
+        }
+      });
+
+      renderPalette();
+      render();
+    })();
+  </script>
+</body>
+</html>
