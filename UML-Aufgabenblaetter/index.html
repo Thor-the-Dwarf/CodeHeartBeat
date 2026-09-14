@@ -792,7 +792,7 @@
 
     .evaluation-panel {
       display: grid;
-      grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+      grid-template-rows: auto auto auto minmax(0, 1fr);
       min-width: 0;
       min-height: 0;
       overflow: hidden;
@@ -856,14 +856,12 @@
     .solution-detail { min-height: 0; }
 
     .solution-card {
-      display: grid;
-      grid-template-rows: auto minmax(0, 1fr);
       height: 100%;
       min-height: 0;
-      padding: 12px;
       border: 1px solid rgba(142, 90, 170, 0.42);
       border-radius: 7px;
-      background: rgba(17, 13, 24, 0.78);
+      overflow: hidden;
+      background: #0d0913;
     }
 
     .solution-card.closest {
@@ -871,35 +869,38 @@
       box-shadow: inset 0 0 0 1px rgba(99, 217, 164, 0.18);
     }
 
-    .solution-card-header { display: flex; align-items: center; gap: 10px; }
-    .solution-card h3 { margin: 0; font-size: 11px; }
-    .solution-score { margin-left: auto; color: #8cebbd; font-size: 12px; font-weight: 900; }
-    .solution-badge { color: #63d9a4; font-size: 8px; font-weight: 900; text-transform: uppercase; }
-    .solution-preview { display: block; width: 100%; height: 100%; min-height: 300px; margin-top: 8px; }
-    .solution-preview path { fill: none; stroke: #8291a3; stroke-width: 1.5; }
-    .solution-preview .preview-node { fill: #15212c; stroke: #9fb1c4; stroke-width: 1.5; }
-    .solution-preview .preview-start { fill: #dbe7f2; }
-    .solution-preview .preview-end-inner { fill: #dbe7f2; stroke: none; }
-
-    .evaluation-legend {
-      display: flex;
-      gap: 16px;
-      margin-top: 14px;
-      color: #aab6c4;
-      font: 650 10px/1.4 system-ui, sans-serif;
+    .solution-preview { display: block; width: 100%; height: 100%; min-height: 420px; }
+    .solution-preview .preview-connection {
+      fill: none;
+      stroke: #d8deea;
+      stroke-width: 3;
+      stroke-linejoin: round;
+      stroke-linecap: round;
+      vector-effect: non-scaling-stroke;
     }
-
-    .evaluation-legend span::before {
-      display: inline-block;
-      width: 9px;
-      height: 9px;
-      margin-right: 6px;
-      border-radius: 50%;
-      content: "";
-      background: #63d9a4;
+    .solution-preview .preview-arrow {
+      fill: none;
+      stroke: #d8deea;
+      stroke-width: 1.7;
+      stroke-linecap: round;
     }
-
-    .evaluation-legend span:last-child::before { background: #ff6c91; }
+    .solution-preview .preview-node {
+      fill: #182634;
+      stroke: #8ba7bd;
+      stroke-width: 2;
+      vector-effect: non-scaling-stroke;
+    }
+    .solution-preview .preview-action { rx: 22px; }
+    .solution-preview .preview-decision { fill: rgba(105, 79, 24, 0.42); stroke: #c7a751; }
+    .solution-preview .preview-start { fill: #9bd0e4; }
+    .solution-preview .preview-end-outer { fill: #080c12; stroke: #dce7f2; stroke-width: 3; }
+    .solution-preview .preview-end-inner { fill: #dce7f2; stroke: none; }
+    .solution-preview .preview-label {
+      fill: #eef3f8;
+      font: 800 10px/1.25 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+      text-anchor: middle;
+      pointer-events: none;
+    }
 
     @keyframes toast-in {
       from { opacity: 0; transform: translateY(8px); }
@@ -1006,7 +1007,6 @@
           <select id="solutionSelect"></select>
         </label>
         <div class="solution-detail" id="solutionDetail"></div>
-        <div class="evaluation-legend"><span>passt zur ausgewählten Lösung</span><span>zusätzlich oder abweichend</span></div>
       </aside>
     </div>
   </main>
@@ -1041,11 +1041,11 @@
           id: "integrated-header",
           name: "Kopfzeile beim Einlesen überspringen",
           nodes: [
-            { id: "start", type: "start", x: 150, y: 14 },
-            { id: "read", type: "action", x: 150, y: 48 },
-            { id: "check", type: "decision", x: 150, y: 91 },
-            { id: "split", type: "action", x: 72, y: 137 },
-            { id: "output", type: "action", x: 72, y: 169 },
+            { id: "start", type: "start", x: 150, y: 14, label: "" },
+            { id: "read", type: "action", x: 150, y: 48, label: "CSV-Daten einlesen\nKopfzeile überspringen" },
+            { id: "check", type: "decision", x: 150, y: 91, label: "Weitere Zeile?" },
+            { id: "split", type: "action", x: 72, y: 137, label: "Datenzeile zerlegen" },
+            { id: "output", type: "action", x: 72, y: 169, label: "Ergebnis ausgeben" },
             { id: "end", type: "end", x: 236, y: 137 }
           ],
           edges: [["start", "read"], ["read", "check"], ["check", "split"], ["split", "output"], ["output", "check"], ["check", "end"]]
@@ -1055,11 +1055,11 @@
           name: "Kopfzeile als eigener Schritt",
           nodes: [
             { id: "start", type: "start", x: 150, y: 12 },
-            { id: "read", type: "action", x: 150, y: 41 },
-            { id: "skip", type: "action", x: 150, y: 70 },
-            { id: "check", type: "decision", x: 150, y: 106 },
-            { id: "split", type: "action", x: 72, y: 145 },
-            { id: "output", type: "action", x: 72, y: 173 },
+            { id: "read", type: "action", x: 150, y: 41, label: "CSV-Daten einlesen" },
+            { id: "skip", type: "action", x: 150, y: 70, label: "Kopfzeile überspringen" },
+            { id: "check", type: "decision", x: 150, y: 106, label: "Weitere Zeile?" },
+            { id: "split", type: "action", x: 72, y: 145, label: "Datenzeile zerlegen" },
+            { id: "output", type: "action", x: 72, y: 173, label: "Ergebnis ausgeben" },
             { id: "end", type: "end", x: 236, y: 145 }
           ],
           edges: [["start", "read"], ["read", "skip"], ["skip", "check"], ["check", "split"], ["split", "output"], ["output", "check"], ["check", "end"]]
@@ -1069,9 +1069,9 @@
           name: "Zerlegen und Ausgeben zusammenfassen",
           nodes: [
             { id: "start", type: "start", x: 150, y: 18 },
-            { id: "read", type: "action", x: 150, y: 58 },
-            { id: "check", type: "decision", x: 150, y: 103 },
-            { id: "process", type: "action", x: 72, y: 154 },
+            { id: "read", type: "action", x: 150, y: 58, label: "CSV-Daten einlesen\nKopfzeile überspringen" },
+            { id: "check", type: "decision", x: 150, y: 103, label: "Weitere Zeile?" },
+            { id: "process", type: "action", x: 72, y: 154, label: "Zeile zerlegen\nErgebnis ausgeben" },
             { id: "end", type: "end", x: 236, y: 154 }
           ],
           edges: [["start", "read"], ["read", "check"], ["check", "process"], ["process", "check"], ["check", "end"]]
@@ -1255,42 +1255,85 @@
         return scored.sort((left, right) => right.similarity - left.similarity || right.matchedEdges - left.matchedEdges)[0];
       }
 
+      function appendSolutionPreviewLabel(svg, node) {
+        if (!node.label) return;
+        const lines = node.label.split("\n");
+        const text = svgElement("text", { class: "preview-label", x: node.x, y: node.y - ((lines.length - 1) * 7) });
+        lines.forEach((line, index) => {
+          const tspan = svgElement("tspan", { x: node.x, dy: index ? 14 : 0 });
+          tspan.textContent = line;
+          text.append(tspan);
+        });
+        svg.append(text);
+      }
+
       function appendSolutionPreviewNode(svg, node) {
         if (node.type === "start") {
-          svg.append(svgElement("circle", { class: "preview-node preview-start", cx: node.x, cy: node.y, r: 7 }));
+          svg.append(svgElement("circle", { class: "preview-node preview-start", cx: node.x, cy: node.y, r: 20 }));
           return;
         }
         if (node.type === "end") {
           svg.append(
-            svgElement("circle", { class: "preview-node", cx: node.x, cy: node.y, r: 8 }),
-            svgElement("circle", { class: "preview-end-inner", cx: node.x, cy: node.y, r: 4 })
+            svgElement("circle", { class: "preview-node preview-end-outer", cx: node.x, cy: node.y, r: 20 }),
+            svgElement("circle", { class: "preview-end-inner", cx: node.x, cy: node.y, r: 10 })
           );
           return;
         }
         if (node.type === "decision") {
-          svg.append(svgElement("polygon", { class: "preview-node", points: `${node.x},${node.y - 12} ${node.x + 12},${node.y} ${node.x},${node.y + 12} ${node.x - 12},${node.y}` }));
+          svg.append(svgElement("polygon", { class: "preview-node preview-decision", points: `${node.x},${node.y - 54} ${node.x + 54},${node.y} ${node.x},${node.y + 54} ${node.x - 54},${node.y}` }));
+          appendSolutionPreviewLabel(svg, node);
           return;
         }
-        svg.append(svgElement("rect", { class: "preview-node", x: node.x - 28, y: node.y - 9, width: 56, height: 18, rx: 5 }));
+        svg.append(svgElement("rect", { class: "preview-node preview-action", x: node.x - 69, y: node.y - 31, width: 138, height: 62, rx: 22 }));
+        appendSolutionPreviewLabel(svg, node);
+      }
+
+      function previewBoundaryPoint(node, toward) {
+        const dx = toward.x - node.x;
+        const dy = toward.y - node.y;
+        if (!dx && !dy) return { x: node.x, y: node.y };
+        const size = node.type === "decision"
+          ? { halfWidth: 54, halfHeight: 54, diamond: true }
+          : node.type === "start" || node.type === "end"
+            ? { halfWidth: 20, halfHeight: 20 }
+            : { halfWidth: 69, halfHeight: 31 };
+        const divisor = size.diamond
+          ? Math.abs(dx) / size.halfWidth + Math.abs(dy) / size.halfHeight
+          : Math.max(Math.abs(dx) / size.halfWidth, Math.abs(dy) / size.halfHeight);
+        const scale = 1 / Math.max(divisor, 0.0001);
+        return { x: node.x + dx * scale, y: node.y + dy * scale };
+      }
+
+      function solutionConnectionPath(from, to) {
+        const start = previewBoundaryPoint(from, to);
+        const end = previewBoundaryPoint(to, from);
+        if (Math.abs(start.x - end.x) < 4) return `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
+        if (to.y > from.y) {
+          const middleY = (start.y + end.y) / 2;
+          return `M ${start.x} ${start.y} L ${start.x} ${middleY} L ${end.x} ${middleY} L ${end.x} ${end.y}`;
+        }
+        const detourX = Math.max(34, Math.min(start.x, end.x) - 92);
+        return `M ${start.x} ${start.y} L ${detourX} ${start.y} L ${detourX} ${end.y} L ${end.x} ${end.y}`;
       }
 
       function createSolutionPreview(pattern) {
-        const svg = svgElement("svg", { class: "solution-preview", viewBox: "0 0 300 190", role: "img", "aria-label": `Musterlösung ${pattern.name}` });
+        const svg = svgElement("svg", { class: "solution-preview", viewBox: "0 0 900 650", role: "img", "aria-label": `Musterlösung ${pattern.name}`, preserveAspectRatio: "xMidYMid meet" });
         const markerId = `preview-arrow-${pattern.id}`;
+        const gridId = `preview-grid-${pattern.id}`;
         const defs = svgElement("defs");
-        const marker = svgElement("marker", { id: markerId, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "6", markerHeight: "6", orient: "auto" });
-        marker.append(svgElement("path", { d: "M 1 1 L 9 5 L 1 9" }));
-        defs.append(marker);
-        svg.append(defs);
+        const marker = svgElement("marker", { id: markerId, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "7", markerHeight: "7", orient: "auto" });
+        marker.append(svgElement("path", { class: "preview-arrow", d: "M 1 1 L 9 5 L 1 9" }));
+        const grid = svgElement("pattern", { id: gridId, width: CELL_WIDTH, height: CELL_HEIGHT, patternUnits: "userSpaceOnUse" });
+        grid.append(svgElement("path", { d: `M ${CELL_WIDTH} 0 L 0 0 0 ${CELL_HEIGHT}`, fill: "none", stroke: "rgba(199, 125, 255, 0.23)", "stroke-width": "1" }));
+        defs.append(marker, grid);
+        svg.append(defs, svgElement("rect", { x: 0, y: 0, width: 900, height: 650, fill: `url(#${gridId})` }));
+        const previewNodes = pattern.nodes.map((node) => ({ ...node, x: node.x * 3, y: node.y * 3.2 }));
         pattern.edges.forEach(([fromId, toId]) => {
-          const from = pattern.nodes.find((node) => node.id === fromId);
-          const to = pattern.nodes.find((node) => node.id === toId);
-          const curve = from.y >= to.y
-            ? `M ${from.x} ${from.y} C ${from.x - 62} ${from.y}, ${to.x - 62} ${to.y}, ${to.x} ${to.y}`
-            : `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
-          svg.append(svgElement("path", { d: curve, "marker-end": `url(#${markerId})` }));
+          const from = previewNodes.find((node) => node.id === fromId);
+          const to = previewNodes.find((node) => node.id === toId);
+          svg.append(svgElement("path", { class: "preview-connection", d: solutionConnectionPath(from, to), "marker-end": `url(#${markerId})` }));
         });
-        pattern.nodes.forEach((node) => appendSolutionPreviewNode(svg, node));
+        previewNodes.forEach((node) => appendSolutionPreviewNode(svg, node));
         return svg;
       }
 
@@ -1325,22 +1368,7 @@
         });
         const card = document.createElement("article");
         card.className = `solution-card${selected.pattern.id === best.pattern.id ? " closest" : ""}`;
-        const header = document.createElement("header");
-        header.className = "solution-card-header";
-        const title = document.createElement("h3");
-        title.textContent = selected.pattern.name;
-        header.append(title);
-        if (selected.pattern.id === best.pattern.id) {
-          const badge = document.createElement("span");
-          badge.className = "solution-badge";
-          badge.textContent = "ähnlichste";
-          header.append(badge);
-        }
-        const score = document.createElement("strong");
-        score.className = "solution-score";
-        score.textContent = `${selected.similarity} %`;
-        header.append(score);
-        card.append(header, createSolutionPreview(selected.pattern));
+        card.append(createSolutionPreview(selected.pattern));
         solutionDetail.replaceChildren(card);
         evaluationPanel.hidden = false;
         workspace.classList.add("has-evaluation");

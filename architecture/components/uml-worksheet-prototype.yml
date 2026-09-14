@@ -1,8 +1,8 @@
 id: worksheet.uml-activity-prototype
 type: component
 path: UML-Aufgabenblaetter/index.html
-what: 'Stellt ein eigenständiges UML-Aufgabenblatt mit prüfungsnahem Aufgabentext, interaktivem Aktivitätsdiagramm-Editor und einer rechts neben dem Diagramm eingeblendeten Strukturauswertung mit auswählbaren Musterlösungen bereit.'
-why: 'Die direkt startbare Einzeldatei bewertet Elementtypen und Verbindungen unabhängig von Beschriftung und Anordnung; Aufgabe, Diagramm und Auswertung bilden drei gleich breite Bildschirmseiten, zwischen denen über die horizontale Scrollleiste gewechselt wird.'
+what: 'Stellt ein eigenständiges UML-Aufgabenblatt mit prüfungsnahem Aufgabentext, interaktivem Aktivitätsdiagramm-Editor und einer rechts neben dem Diagramm eingeblendeten Strukturauswertung mit auswählbaren Musterlösungen im originalgetreuen Diagrammraster bereit.'
+why: 'Die direkt startbare Einzeldatei bewertet Elementtypen und Verbindungen unabhängig von Beschriftung und Anordnung; Aufgabe, Diagramm und Auswertung bilden drei gleich breite Bildschirmseiten, während die Musterlösung ohne redundante Karteninformationen dieselbe Raster- und Formensprache wie der Editor verwendet.'
 depends_on:
   - diagram-builder.workspace
   - diagram-builder.element-catalog
