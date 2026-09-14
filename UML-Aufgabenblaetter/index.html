@@ -122,7 +122,7 @@
     }
 
     .workspace.has-evaluation {
-      grid-template-columns: minmax(360px, 42vw) minmax(620px, 58vw) minmax(380px, 440px);
+      grid-template-columns: minmax(360px, 42vw) minmax(620px, 58vw) minmax(620px, 58vw);
     }
 
     .task-pane {
@@ -791,9 +791,11 @@
     .toast.visible { display: block; animation: toast-in 180ms ease-out; }
 
     .evaluation-panel {
+      display: grid;
+      grid-template-rows: auto auto auto minmax(0, 1fr) auto;
       min-width: 0;
       min-height: 0;
-      overflow: auto;
+      overflow: hidden;
       padding: 18px;
       border-left: 1px solid rgba(99, 217, 164, 0.45);
       background: #0a0e14;
@@ -831,9 +833,33 @@
       font: 650 11px/1.55 system-ui, sans-serif;
     }
 
-    .solution-list { display: grid; gap: 12px; }
+    .solution-picker {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+      color: #aab6c4;
+      font: 800 10px/1.4 system-ui, sans-serif;
+    }
+
+    .solution-picker select {
+      min-width: 0;
+      padding: 9px 34px 9px 11px;
+      border: 1px solid rgba(199, 125, 255, 0.42);
+      border-radius: 5px;
+      color: #ece8f2;
+      background: #15101e;
+      font: 750 11px/1.4 system-ui, sans-serif;
+    }
+
+    .solution-detail { min-height: 0; }
 
     .solution-card {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      height: 100%;
+      min-height: 0;
       padding: 12px;
       border: 1px solid rgba(142, 90, 170, 0.42);
       border-radius: 7px;
@@ -849,7 +875,7 @@
     .solution-card h3 { margin: 0; font-size: 11px; }
     .solution-score { margin-left: auto; color: #8cebbd; font-size: 12px; font-weight: 900; }
     .solution-badge { color: #63d9a4; font-size: 8px; font-weight: 900; text-transform: uppercase; }
-    .solution-preview { display: block; width: 100%; height: 180px; margin-top: 8px; }
+    .solution-preview { display: block; width: 100%; height: 100%; min-height: 300px; margin-top: 8px; }
     .solution-preview path { fill: none; stroke: #8291a3; stroke-width: 1.5; }
     .solution-preview .preview-node { fill: #15212c; stroke: #9fb1c4; stroke-width: 1.5; }
     .solution-preview .preview-start { fill: #dbe7f2; }
@@ -975,8 +1001,12 @@
           <button class="evaluation-close" id="evaluationClose" type="button" aria-label="Auswertung schließen">✕</button>
         </header>
         <div class="evaluation-summary" id="evaluationSummary"></div>
-        <div class="solution-list" id="solutionList"></div>
-        <div class="evaluation-legend"><span>passt zur ähnlichsten Lösung</span><span>zusätzlich oder abweichend</span></div>
+        <label class="solution-picker" for="solutionSelect">
+          <span>Musterlösung</span>
+          <select id="solutionSelect"></select>
+        </label>
+        <div class="solution-detail" id="solutionDetail"></div>
+        <div class="evaluation-legend"><span>passt zur ausgewählten Lösung</span><span>zusätzlich oder abweichend</span></div>
       </aside>
     </div>
   </main>
@@ -1075,7 +1105,8 @@
       const evaluationPanel = document.getElementById("evaluationPanel");
       const evaluationClose = document.getElementById("evaluationClose");
       const evaluationSummary = document.getElementById("evaluationSummary");
-      const solutionList = document.getElementById("solutionList");
+      const solutionSelect = document.getElementById("solutionSelect");
+      const solutionDetail = document.getElementById("solutionDetail");
 
       let state = loadState();
       let selectedNodeId = null;
@@ -1265,13 +1296,14 @@
 
       function applyEvaluationHighlights() {
         if (!evaluation) return;
+        const selected = evaluation.results.find((result) => result.pattern.id === evaluation.selectedPatternId) || evaluation.best;
         surface.querySelectorAll(".node").forEach((node) => {
-          const correct = evaluation.best.correctNodeIds.has(node.dataset.nodeId);
+          const correct = selected.correctNodeIds.has(node.dataset.nodeId);
           node.classList.add(correct ? "evaluation-correct" : "evaluation-wrong");
         });
         surface.querySelectorAll(".connection-group").forEach((group) => {
           const edgeId = group.querySelector(".connection-hit")?.dataset.edgeId;
-          const correct = evaluation.best.correctEdgeIds.has(edgeId);
+          const correct = selected.correctEdgeIds.has(edgeId);
           group.classList.add(correct ? "evaluation-correct" : "evaluation-wrong");
         });
       }
@@ -1279,31 +1311,37 @@
       function renderEvaluationPanel() {
         if (!evaluation) return;
         const best = evaluation.best;
+        const selected = evaluation.results.find((result) => result.pattern.id === evaluation.selectedPatternId) || best;
         evaluationSummary.textContent = state.nodes.length
-          ? `Am ähnlichsten ist „${best.pattern.name}“ mit ${best.similarity} %. ${best.matchedNodes} von ${best.pattern.nodes.length} Elementen und ${best.matchedEdges} von ${best.pattern.edges.length} Verbindungen stimmen strukturell überein.`
-          : "Die Arbeitsfläche enthält noch keine auswertbaren Elemente. Unten siehst du alle zulässigen Musterlösungen.";
-        solutionList.replaceChildren();
+          ? `${selected.pattern.id === best.pattern.id ? "Am ähnlichsten" : "Ausgewählt"} ist „${selected.pattern.name}“ mit ${selected.similarity} %. ${selected.matchedNodes} von ${selected.pattern.nodes.length} Elementen und ${selected.matchedEdges} von ${selected.pattern.edges.length} Verbindungen stimmen strukturell überein.`
+          : "Die Arbeitsfläche enthält noch keine auswertbaren Elemente. Wähle eine zulässige Musterlösung aus.";
+        solutionSelect.replaceChildren();
         evaluation.results.forEach((result) => {
-          const card = document.createElement("article");
-          card.className = `solution-card${result.pattern.id === best.pattern.id ? " closest" : ""}`;
-          const header = document.createElement("header");
-          header.className = "solution-card-header";
-          const title = document.createElement("h3");
-          title.textContent = result.pattern.name;
-          header.append(title);
-          if (result.pattern.id === best.pattern.id) {
-            const badge = document.createElement("span");
-            badge.className = "solution-badge";
-            badge.textContent = "ähnlichste";
-            header.append(badge);
-          }
-          const score = document.createElement("strong");
-          score.className = "solution-score";
-          score.textContent = `${result.similarity} %`;
-          header.append(score);
-          card.append(header, createSolutionPreview(result.pattern));
-          solutionList.append(card);
+          const option = document.createElement("option");
+          option.value = result.pattern.id;
+          option.textContent = `${result.pattern.name} · ${result.similarity} %${result.pattern.id === best.pattern.id ? " · ähnlichste" : ""}`;
+          option.selected = result.pattern.id === selected.pattern.id;
+          solutionSelect.append(option);
         });
+        const card = document.createElement("article");
+        card.className = `solution-card${selected.pattern.id === best.pattern.id ? " closest" : ""}`;
+        const header = document.createElement("header");
+        header.className = "solution-card-header";
+        const title = document.createElement("h3");
+        title.textContent = selected.pattern.name;
+        header.append(title);
+        if (selected.pattern.id === best.pattern.id) {
+          const badge = document.createElement("span");
+          badge.className = "solution-badge";
+          badge.textContent = "ähnlichste";
+          header.append(badge);
+        }
+        const score = document.createElement("strong");
+        score.className = "solution-score";
+        score.textContent = `${selected.similarity} %`;
+        header.append(score);
+        card.append(header, createSolutionPreview(selected.pattern));
+        solutionDetail.replaceChildren(card);
         evaluationPanel.hidden = false;
         workspace.classList.add("has-evaluation");
         requestAnimationFrame(() => {
@@ -1314,7 +1352,7 @@
       function evaluateDiagram() {
         const results = solutionPatterns.map(evaluatePattern);
         const best = [...results].sort((left, right) => right.similarity - left.similarity || right.matchedEdges - left.matchedEdges)[0];
-        evaluation = { results, best };
+        evaluation = { results, best, selectedPatternId: best.pattern.id };
         render();
         renderEvaluationPanel();
       }
@@ -2183,6 +2221,12 @@
       });
 
       evaluateButton.addEventListener("click", evaluateDiagram);
+      solutionSelect.addEventListener("change", () => {
+        if (!evaluation) return;
+        evaluation.selectedPatternId = solutionSelect.value;
+        render();
+        renderEvaluationPanel();
+      });
       evaluationClose.addEventListener("click", () => {
         evaluation = null;
         evaluationPanel.hidden = true;
