@@ -114,7 +114,7 @@
 
     .workspace {
       display: grid;
-      grid-template-columns: minmax(360px, 42vw) minmax(620px, 58vw);
+      grid-template-columns: repeat(2, minmax(540px, 50vw));
       min-width: 0;
       min-height: 0;
       overflow-x: auto;
@@ -122,7 +122,7 @@
     }
 
     .workspace.has-evaluation {
-      grid-template-columns: minmax(360px, 42vw) minmax(620px, 58vw) minmax(620px, 58vw);
+      grid-template-columns: repeat(3, minmax(540px, 50vw));
     }
 
     .task-pane {
