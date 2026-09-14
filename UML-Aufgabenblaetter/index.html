@@ -114,9 +114,15 @@
 
     .workspace {
       display: grid;
-      grid-template-columns: minmax(360px, 42%) minmax(620px, 58%);
+      grid-template-columns: minmax(360px, 42vw) minmax(620px, 58vw);
       min-width: 0;
       min-height: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
+    .workspace.has-evaluation {
+      grid-template-columns: minmax(360px, 42vw) minmax(620px, 58vw) minmax(380px, 440px);
     }
 
     .task-pane {
@@ -785,18 +791,13 @@
     .toast.visible { display: block; animation: toast-in 180ms ease-out; }
 
     .evaluation-panel {
-      position: fixed;
-      z-index: 110;
-      top: 72px;
-      right: 18px;
-      bottom: 18px;
-      width: min(520px, calc(100vw - 36px));
+      min-width: 0;
+      min-height: 0;
       overflow: auto;
       padding: 18px;
-      border: 1px solid rgba(99, 217, 164, 0.45);
-      border-radius: 9px;
-      background: rgba(10, 14, 20, 0.98);
-      box-shadow: 0 20px 55px rgba(0, 0, 0, 0.68);
+      border-left: 1px solid rgba(99, 217, 164, 0.45);
+      background: #0a0e14;
+      box-shadow: inset 12px 0 30px rgba(0, 0, 0, 0.2);
     }
 
     .evaluation-panel[hidden] { display: none; }
@@ -964,23 +965,24 @@
           </div>
         </div>
       </section>
+
+      <aside class="evaluation-panel" id="evaluationPanel" aria-labelledby="evaluationTitle" hidden>
+        <header class="evaluation-header">
+          <div>
+            <h2 id="evaluationTitle">Strukturauswertung</h2>
+            <p>Texte und Anordnung werden bewusst nicht berücksichtigt.</p>
+          </div>
+          <button class="evaluation-close" id="evaluationClose" type="button" aria-label="Auswertung schließen">✕</button>
+        </header>
+        <div class="evaluation-summary" id="evaluationSummary"></div>
+        <div class="solution-list" id="solutionList"></div>
+        <div class="evaluation-legend"><span>passt zur ähnlichsten Lösung</span><span>zusätzlich oder abweichend</span></div>
+      </aside>
     </div>
   </main>
 
   <div class="trash" id="trash">⌫ Element löschen</div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <aside class="evaluation-panel" id="evaluationPanel" aria-labelledby="evaluationTitle" hidden>
-    <header class="evaluation-header">
-      <div>
-        <h2 id="evaluationTitle">Strukturauswertung</h2>
-        <p>Texte und Anordnung werden bewusst nicht berücksichtigt.</p>
-      </div>
-      <button class="evaluation-close" id="evaluationClose" type="button" aria-label="Auswertung schließen">✕</button>
-    </header>
-    <div class="evaluation-summary" id="evaluationSummary"></div>
-    <div class="solution-list" id="solutionList"></div>
-    <div class="evaluation-legend"><span>passt zur ähnlichsten Lösung</span><span>zusätzlich oder abweichend</span></div>
-  </aside>
 
   <script>
     (() => {
@@ -1069,6 +1071,7 @@
       const toast = document.getElementById("toast");
       const resetButton = document.getElementById("resetButton");
       const evaluateButton = document.getElementById("evaluateButton");
+      const workspace = document.querySelector(".workspace");
       const evaluationPanel = document.getElementById("evaluationPanel");
       const evaluationClose = document.getElementById("evaluationClose");
       const evaluationSummary = document.getElementById("evaluationSummary");
@@ -1145,6 +1148,7 @@
         if (!keepEvaluation && evaluation) {
           evaluation = null;
           evaluationPanel.hidden = true;
+          workspace.classList.remove("has-evaluation");
         }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       }
@@ -1301,6 +1305,10 @@
           solutionList.append(card);
         });
         evaluationPanel.hidden = false;
+        workspace.classList.add("has-evaluation");
+        requestAnimationFrame(() => {
+          workspace.scrollTo({ left: workspace.scrollWidth, behavior: "smooth" });
+        });
       }
 
       function evaluateDiagram() {
@@ -2163,6 +2171,7 @@
           state = defaultState();
           evaluation = null;
           evaluationPanel.hidden = true;
+          workspace.classList.remove("has-evaluation");
           selectedNodeId = null;
           selectedSwimlaneId = null;
           selectedEdgeId = null;
@@ -2177,6 +2186,7 @@
       evaluationClose.addEventListener("click", () => {
         evaluation = null;
         evaluationPanel.hidden = true;
+        workspace.classList.remove("has-evaluation");
         render();
       });
 
