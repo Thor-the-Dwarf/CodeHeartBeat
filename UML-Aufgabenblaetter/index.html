@@ -901,6 +901,14 @@
       text-anchor: middle;
       pointer-events: none;
     }
+    .solution-preview .preview-edge-label {
+      fill: #ffe8a8;
+      stroke: #0d0913;
+      stroke-width: 5px;
+      paint-order: stroke fill;
+      font: 800 14px "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+      pointer-events: none;
+    }
 
     @keyframes toast-in {
       from { opacity: 0; transform: translateY(8px); }
@@ -1048,7 +1056,7 @@
             { id: "output", type: "action", x: 72, y: 169, label: "Ergebnis ausgeben" },
             { id: "end", type: "end", x: 236, y: 137 }
           ],
-          edges: [["start", "read"], ["read", "check"], ["check", "split"], ["split", "output"], ["output", "check"], ["check", "end"]]
+          edges: [["start", "read"], ["read", "check"], ["check", "split", "Ja"], ["split", "output"], ["output", "check"], ["check", "end", "Nein"]]
         },
         {
           id: "separate-header",
@@ -1062,7 +1070,7 @@
             { id: "output", type: "action", x: 72, y: 173, label: "Ergebnis ausgeben" },
             { id: "end", type: "end", x: 236, y: 145 }
           ],
-          edges: [["start", "read"], ["read", "skip"], ["skip", "check"], ["check", "split"], ["split", "output"], ["output", "check"], ["check", "end"]]
+          edges: [["start", "read"], ["read", "skip"], ["skip", "check"], ["check", "split", "Ja"], ["split", "output"], ["output", "check"], ["check", "end", "Nein"]]
         },
         {
           id: "combined-processing",
@@ -1074,7 +1082,7 @@
             { id: "process", type: "action", x: 72, y: 154, label: "Zeile zerlegen\nErgebnis ausgeben" },
             { id: "end", type: "end", x: 236, y: 154 }
           ],
-          edges: [["start", "read"], ["read", "check"], ["check", "process"], ["process", "check"], ["check", "end"]]
+          edges: [["start", "read"], ["read", "check"], ["check", "process", "Ja"], ["process", "check"], ["check", "end", "Nein"]]
         }
       ];
 
@@ -1328,10 +1336,22 @@
         defs.append(marker, grid);
         svg.append(defs, svgElement("rect", { x: 0, y: 0, width: 900, height: 650, fill: `url(#${gridId})` }));
         const previewNodes = pattern.nodes.map((node) => ({ ...node, x: node.x * 3, y: node.y * 3.2 }));
-        pattern.edges.forEach(([fromId, toId]) => {
+        pattern.edges.forEach(([fromId, toId, label]) => {
           const from = previewNodes.find((node) => node.id === fromId);
           const to = previewNodes.find((node) => node.id === toId);
           svg.append(svgElement("path", { class: "preview-connection", d: solutionConnectionPath(from, to), "marker-end": `url(#${markerId})` }));
+          if (label && from.type === "decision") {
+            const start = previewBoundaryPoint(from, to);
+            const end = previewBoundaryPoint(to, from);
+            const labelText = svgElement("text", {
+              class: "preview-edge-label",
+              x: start.x + (to.x < from.x ? -14 : 14),
+              y: (start.y + end.y) / 2 - 10,
+              "text-anchor": to.x < from.x ? "end" : "start"
+            });
+            labelText.textContent = label;
+            svg.append(labelText);
+          }
         });
         previewNodes.forEach((node) => appendSolutionPreviewNode(svg, node));
         return svg;
