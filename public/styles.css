@@ -6453,3 +6453,22 @@ body.folder-tree-resizing {
   }
 
 }
+
+.diagram-builder-pan-space {
+  box-sizing: content-box;
+  display: grid;
+  grid-template-columns: max-content;
+  width: max-content;
+  background: var(--theme-surface, #0a0810);
+}
+
+.diagram-builder-connection-drag-ghost {
+  opacity: 0.86;
+  pointer-events: none;
+  filter: drop-shadow(0 0 10px var(--theme-glow-red, rgba(255, 79, 121, 0.76)));
+}
+
+.diagram-builder-connection-drag-ghost .diagram-builder-connector {
+  stroke: var(--theme-ink-red, #ff4f79);
+  stroke-width: 3px;
+}

@@ -2,6 +2,9 @@ id: diagram-builder.sequence-elements
 type: component
 path: public/app.js
 symbol: beginDiagramBuilderSequenceParticipantEdit
+# Lebenslinien haben keine Pfeilanschlüsse. Zwei wiederverwendbare Anschlüsse
+# am Aktivitätsbalken verwenden dieselbe automatische Verteilung wie andere
+# Elemente. Ein- und ausgehende Nachrichten reservieren getrennte Andockpunkte.
 what: 'Steuert Lebenslinien, Aktivitätsbalken, Selbstbeziehungen und kombinierte Fragmente des Sequenzdiagramm-Editors.'
 why: 'Diese Elemente folgen zeitlichen und geometrischen Sonderregeln, die nicht mit dem allgemeinen Rasterverhalten gleichgesetzt werden dürfen.'
 depends_on:

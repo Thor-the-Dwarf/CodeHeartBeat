@@ -2,6 +2,10 @@ id: diagram-builder.connection-routing
 type: component
 path: public/app.js
 symbol: drawDiagramBuilderConnections
+# Gemeinsame Portverteilung für Anfang und Ende verhindert doppelt belegte
+# Kontaktpunkte. Beim Ziehen zum Papierkorb folgt eine vollständige SVG-Kopie
+# dem Mauszeiger außerhalb der scrollenden Fläche, einschließlich Beschriftung
+# und Pfeilspitzen. Abbrechen erhält die Verbindung; Bestätigen entfernt ihre Pins.
 what: 'Berechnet Ports, orthogonale Rasterpfade, Abstände, Beschriftungen und Bearbeitungspositionen für Diagrammverbindungen.'
 why: 'Pfeile sollen sich automatisch an verschobene Elemente anpassen, Linien möglichst nicht überlagern und diagrammspezifische Regeln einhalten.'
 depends_on:

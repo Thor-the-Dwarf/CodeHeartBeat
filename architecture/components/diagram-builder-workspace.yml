@@ -2,6 +2,9 @@ id: diagram-builder.workspace
 type: subsystem
 path: public/app.js
 symbol: openDiagramBuilderMode
+# Die Navigation hat einen festen Rand von 64 px. Nur platzierte Elemente
+# erweitern die Zeichenfläche nach rechts/unten; Scrollen und Ziehvorschauen
+# erzeugen keinen zusätzlichen Raum. Freie Fläche lässt sich begrenzt verschieben.
 what: 'Öffnet den Zeichenmodus mit Quellcode, Diagrammauswahl, Bausteinleiste, Rasterfläche und getrenntem Zoomverhalten.'
 why: 'Der Vollbild-Arbeitsbereich erlaubt die manuelle Übertragung des Codes in unterschiedliche Diagrammarten, ohne den Dateikontext zu verlieren.'
 depends_on:

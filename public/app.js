@@ -2943,8 +2943,8 @@ function updateDiagramBuilderGridMetrics(session) {
   );
   session.surface.style.setProperty("--builder-cell-width", `${session.cellWidth}px`);
   session.surface.style.setProperty("--builder-cell-height", `${session.cellHeight}px`);
-  session.surface.style.minWidth = `${Math.max(640, (maximumColumn + 1) * session.cellWidth)}px`;
-  session.surface.style.minHeight = `${Math.max(600, (maximumRow + 1) * session.cellHeight)}px`;
+  session.surface.style.minWidth = `${Math.max(640, (maximumColumn + 5) * session.cellWidth)}px`;
+  session.surface.style.minHeight = `${Math.max(600, (maximumRow + 5) * session.cellHeight)}px`;
 }
 
 function diagramBuilderCellFromPoint(session, clientX, clientY) {
@@ -3153,6 +3153,9 @@ function updateDiagramBuilderRepositionPreview(session, clientX, clientY) {
 
 function beginDiagramBuilderPaletteDrag(session, pieceIndex, button, event) {
   if (event.button !== 0) return;
+  event.preventDefault();
+  button.focus({ preventScroll: true });
+  hideDiagramBuilderPaletteTooltip(session);
   const drag = {
     pointerId: event.pointerId,
     startX: event.clientX,
@@ -4352,6 +4355,15 @@ function createDiagramBuilderContainerMoveHandle(session, kind, item, node, opti
 }
 
 function cancelDiagramBuilderDeletion(session) {
+  if (session.pendingConnectionDeletion) {
+    const connectionId = session.pendingConnectionDeletion;
+    session.pendingConnectionDeletion = null;
+    session.toast.hidden = true;
+    session.connectorLayer?.querySelector(`[data-connection-id="${connectionId}"]`)?.classList.remove("awaiting-delete-confirmation", "dragging");
+    renderDiagramBuilderPalette(session);
+    setDiagramBuilderStatus(session, "Löschen abgebrochen – Pfeil bleibt erhalten.");
+    return;
+  }
   if (session.pendingContainerDeletion) {
     const { kind, id } = session.pendingContainerDeletion;
     session.pendingContainerDeletion = null;
@@ -4387,6 +4399,18 @@ function cancelDiagramBuilderDeletion(session) {
 }
 
 function confirmDiagramBuilderDeletion(session) {
+  if (session.pendingConnectionDeletion) {
+    const connectionId = session.pendingConnectionDeletion;
+    session.pendingConnectionDeletion = null;
+    session.toast.hidden = true;
+    session.connections = session.connections.filter((connection) => connection.id !== connectionId);
+    session.pins = session.pins.filter((pin) => pin.connectionId !== connectionId);
+    if (session.hoveredConnectionId === connectionId) session.hoveredConnectionId = null;
+    if (session.draggingConnectionId === connectionId) session.draggingConnectionId = null;
+    renderDiagramBuilderWorkspace(session);
+    setDiagramBuilderStatus(session, "Pfeil wurde gelöscht.", "success");
+    return;
+  }
   if (session.pendingContainerDeletion) {
     const { kind, id } = session.pendingContainerDeletion;
     session.pendingContainerDeletion = null;
@@ -4752,6 +4776,63 @@ function diagramBuilderAutomaticTargetSides(session, sourceSides) {
   return sides;
 }
 
+function diagramBuilderPortAssignments(session, sourceSides, targetSides) {
+  const source = new Map(), target = new Map(), groups = new Map();
+  const placements = new Map(session.placements.map(item => [item.id, item]));
+  const zoom = session.gridZoom || 1;
+  const rects = new Map(session.placements.map(item => {
+    const rect = session.surface.querySelector(`[data-placement-id="${item.id}"] .diagram-builder-piece`)?.getBoundingClientRect();
+    const metrics = diagramBuilderPieceMetrics(item.piece);
+    return [item.id, rect ? {
+      left: rect.left / zoom, top: rect.top / zoom,
+      width: rect.width / zoom, height: rect.height / zoom
+    } : {
+      left: item.column * session.cellWidth, top: item.row * session.cellHeight,
+      width: metrics.visualWidth, height: metrics.visualHeight
+    }];
+  }));
+  session.connections.forEach(connection => {
+    for (const endpoint of ["source", "target"]) {
+      const id = connection[endpoint + "Id"];
+      const partnerId = connection[endpoint === "source" ? "targetId" : "sourceId"];
+      if (!placements.has(id) || !placements.has(partnerId)) continue;
+      const side = (endpoint === "source" ? sourceSides : targetSides).get(connection.id)
+        || (endpoint === "source" ? "right" : "left");
+      const key = `${id}:${side}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push({ connection, endpoint, id, partnerId, side });
+    }
+  });
+  groups.forEach(ports => {
+    const box = rects.get(ports[0].id);
+    const vertical = ["left", "right"].includes(ports[0].side);
+    const length = vertical ? box.height : box.width;
+    const origin = vertical ? box.top : box.left;
+    const min = length * 0.14, max = length * 0.86;
+    // Attraction to the partner's position, repulsion shared by BOTH endpoint roles.
+    ports.forEach(port => {
+      const partner = rects.get(port.partnerId);
+      port.desired = Math.max(min, Math.min(max,
+        (vertical ? partner.top + partner.height / 2 : partner.left + partner.width / 2) - origin));
+    });
+    ports.sort((a, b) => a.desired - b.desired
+      || String(a.connection.id).localeCompare(String(b.connection.id), undefined, { numeric: true })
+      || a.endpoint.localeCompare(b.endpoint));
+    const gap = Math.min(24, (max - min) / Math.max(1, ports.length - 1));
+    const positions = ports.map(port => port.desired);
+    // Bounded projection gives stable positions, without a jittering physics loop.
+    for (let i = 1; i < positions.length; i++) positions[i] = Math.max(positions[i], positions[i - 1] + gap);
+    const overflow = Math.max(0, positions.at(-1) - max);
+    if (overflow) positions.forEach((value, i) => { positions[i] = value - overflow; });
+    for (let i = positions.length - 2; i >= 0; i--) positions[i] = Math.min(positions[i], positions[i + 1] - gap);
+    const underflow = Math.max(0, min - positions[0]);
+    ports.forEach((port, i) => {
+      (port.endpoint === "source" ? source : target).set(port.connection.id, (positions[i] + underflow) / length);
+    });
+  });
+  return { source, target };
+}
+
 function diagramBuilderSourcePortAssignments(session, sourceSides) {
   const assignments = new Map();
   const groups = new Map();
@@ -5076,6 +5157,7 @@ function openDiagramBuilderEndpointMenu(session, connection, endpoint) {
 }
 
 function renderDiagramBuilderEndpointControls(session, connection, route, surfaceRect) {
+  if (session.pendingConnection) return;
   if (session.editingConnectionId !== connection.id) return;
   const fixedConnectionStyle = diagramBuilderIsUseCaseDependency(session, connection)
     || session.viewType === "sequence"
@@ -5263,8 +5345,7 @@ function drawDiagramBuilderConnections(session) {
   const routedSegments = [];
   const automaticSourceSides = diagramBuilderAutomaticSourceSides(session);
   const automaticTargetSides = diagramBuilderAutomaticTargetSides(session, automaticSourceSides);
-  const sourcePortAssignments = diagramBuilderSourcePortAssignments(session, automaticSourceSides);
-  const targetPortAssignments = diagramBuilderTargetPortAssignments(session, automaticTargetSides);
+  const { source: sourcePortAssignments, target: targetPortAssignments } = diagramBuilderPortAssignments(session, automaticSourceSides, automaticTargetSides);
   const nodeRects = session.placements.map((placement) => {
     const node = session.surface.querySelector(`[data-placement-id="${placement.id}"] .diagram-builder-piece`);
     if (!node) return null;
@@ -5494,7 +5575,108 @@ function drawDiagramBuilderConnections(session) {
       d: pathData
     });
     const path = createSvgElement("path", pathAttributes);
+    let connectionDrag = null;
+    let suppressConnectionClick = false;
+    const connectionDragOverTrash = (event) => {
+      const trash = session.palette.querySelector(".diagram-builder-trash-target");
+      const trashRect = trash?.getBoundingClientRect();
+      const overTrash = Boolean(trashRect
+        && event.clientX >= trashRect.left && event.clientX <= trashRect.right
+        && event.clientY >= trashRect.top && event.clientY <= trashRect.bottom);
+      trash?.classList.toggle("drag-over", overTrash);
+      return overTrash;
+    };
+    const updateConnectionDragGhost = (event) => {
+      if (!connectionDrag?.ghost) return;
+      const { a, b, c, d, e, f } = connectionDrag.matrix;
+      const dx = event.clientX - connectionDrag.startX;
+      const dy = event.clientY - connectionDrag.startY;
+      connectionDrag.preview.setAttribute("transform", `matrix(${a} ${b} ${c} ${d} ${e + dx} ${f + dy})`);
+    };
+    const createConnectionDragGhost = () => {
+      // Keep the preview outside the scrolling/redrawn canvas, including its markers.
+      const ghost = createSvgElement("svg", { class: "diagram-builder-connectors diagram-builder-connection-drag-ghost", "aria-hidden": "true" });
+      ghost.style.cssText = "position:fixed;inset:0;width:100%;height:100%;z-index:1060;pointer-events:none;overflow:visible";
+      const preview = connectionGroup.cloneNode(true);
+      preview.removeAttribute("data-connection-id");
+      preview.querySelectorAll(".diagram-builder-connector-hit, .diagram-builder-connection-pin").forEach(node => node.remove());
+      const markerDefinitions = definitions.cloneNode(true);
+      const ids = new Map();
+      markerDefinitions.querySelectorAll("[id]").forEach(node => {
+        const id = `diagram-builder-drag-${connection.id}-${node.id}`;
+        ids.set(node.id, id);
+        node.id = id;
+      });
+      ghost.append(markerDefinitions, preview);
+      ghost.querySelectorAll("*").forEach(node => {
+        node.style.pointerEvents = "none";
+        for (const attribute of [...node.attributes]) {
+          if (attribute.value.includes("url(#")) node.setAttribute(attribute.name,
+            attribute.value.replace(/url\(#([^)]*)\)/g, (value, id) => ids.has(id) ? `url(#${ids.get(id)})` : value));
+        }
+      });
+      connectionDrag.preview = preview;
+      session.overlay.append(ghost);
+      return ghost;
+    };
+    const moveConnectionDrag = (event) => {
+      if (!connectionDrag || event.pointerId !== connectionDrag.pointerId) return;
+      if (!connectionDrag.active && Math.hypot(event.clientX - connectionDrag.startX, event.clientY - connectionDrag.startY) < 8) return;
+      event.preventDefault();
+      if (!connectionDrag.active) {
+        connectionDrag.active = true;
+        connectionDrag.ghost = createConnectionDragGhost();
+        connectionGroup.classList.add("dragging");
+        showDiagramBuilderConnectionTrashTarget(session, connection);
+      }
+      updateConnectionDragGhost(event);
+      connectionDragOverTrash(event);
+    };
+    let cancelConnectionDrag = null;
+    const finishConnectionDrag = (event, cancelled = false) => {
+      if (!connectionDrag || event.pointerId !== connectionDrag.pointerId) return;
+      const currentDrag = connectionDrag;
+      connectionDrag = null;
+      window.removeEventListener("pointermove", moveConnectionDrag);
+      window.removeEventListener("pointerup", finishConnectionDrag);
+      window.removeEventListener("pointercancel", cancelConnectionDrag);
+      if (!currentDrag.active) return;
+      suppressConnectionClick = true;
+      window.setTimeout(() => { suppressConnectionClick = false; }, 160);
+      event.preventDefault();
+      event.stopPropagation();
+      const overTrash = !cancelled && connectionDragOverTrash(event);
+      currentDrag.ghost?.remove();
+      session.palette.querySelector(".diagram-builder-trash-target")?.classList.remove("drag-over");
+      connectionGroup.classList.remove("dragging");
+      session.draggingConnectionId = null;
+      if (overTrash) {
+        requestDiagramBuilderConnectionDeletion(session, connection, event.clientX, event.clientY);
+        return;
+      }
+      renderDiagramBuilderPalette(session);
+      setDiagramBuilderStatus(session, "Pfeil bleibt erhalten.");
+    };
+    cancelConnectionDrag = (event) => finishConnectionDrag(event, true);
+    connectionGroup.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      if (event.target.closest?.(".diagram-builder-connection-pin, .diagram-builder-endpoint-control")) return;
+      // Cancel native text-selection autoscroll before the pointer drag starts.
+      event.preventDefault();
+      connectionDrag = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        matrix: path.getScreenCTM(),
+        active: false,
+        ghost: null
+      };
+      window.addEventListener("pointermove", moveConnectionDrag, { passive: false });
+      window.addEventListener("pointerup", finishConnectionDrag);
+      window.addEventListener("pointercancel", cancelConnectionDrag);
+    });
     connectionGroup.addEventListener("dblclick", (event) => {
+      if (suppressConnectionClick) return;
       event.preventDefault();
       event.stopPropagation();
       if (isUseCaseDependency) beginDiagramBuilderUseCaseDependencyEdit(session, connection, route, surfaceRect);
@@ -5626,7 +5808,8 @@ function createDiagramBuilderPlacedNode(session, placement) {
   connectionHandleSides.forEach(([side, icon, decisionActionIndex = null, actionFraction = 0.5]) => {
     const fraction = actionFraction;
     const port = diagramBuilderPortOnBox(handleBox, side, fraction, isDiamond);
-    const left = port.x + (side === "left" ? -8 : side === "right" ? 8 : 0);
+    const offset = placement.piece.kind === "sequence-activation" ? 24 : 8;
+    const left = port.x + (side === "left" ? -offset : side === "right" ? offset : 0);
     const top = port.y + (side === "top" ? -8 : side === "bottom" ? 8 : 0);
     const handle = createElement("button", `diagram-builder-connection-handle ${side}`, icon);
     handle.type = "button";
@@ -6574,11 +6757,109 @@ function closeDiagramBuilderMode() {
   activeDiagramBuilderSession.finishSequenceFragmentEditing?.(true);
   activeDiagramBuilderSession.finishPinEditing?.(true);
   document.removeEventListener("keydown", activeDiagramBuilderSession.handleKeyDown, true);
+  activeDiagramBuilderSession.disposeCanvasPan?.();
   activeDiagramBuilderSession.resizeObserver?.disconnect();
   activeDiagramBuilderSession.overlay.remove();
   document.body.classList.remove("diagram-builder-open");
   activeDiagramBuilderSession.returnFocus?.focus({ preventScroll: true });
   activeDiagramBuilderSession = null;
+}
+
+function showDiagramBuilderConnectionTrashTarget(session, connection) {
+  clearDiagramBuilderPlacementMode(session);
+  clearDiagramBuilderConnectionMode(session);
+  session.draggingConnectionId = connection.id;
+  session.paletteWrap.classList.add("trash-active");
+  session.palette.classList.add("trash-mode");
+  session.paletteLabel.textContent = "PFEIL ENTFERNEN";
+  const trash = createElement("div", "diagram-builder-trash-target");
+  trash.setAttribute("role", "button");
+  trash.setAttribute("aria-label", "Pfeil hier ablegen, um ihn zu löschen");
+  trash.append(createElement("span", "diagram-builder-trash-icon", "🗑"), createElement("strong", "", "Zum Löschen hier ablegen"));
+  session.palette.replaceChildren(trash);
+}
+
+function positionDiagramBuilderConfirmToast(session) {
+  const rect = session.canvasViewport?.getBoundingClientRect?.();
+  if (!rect) return;
+  session.toast.style.left = `${rect.left + rect.width / 2}px`;
+  session.toast.style.top = `${rect.top + rect.height / 2}px`;
+}
+
+function requestDiagramBuilderConnectionDeletion(session, connection, clientX, clientY) {
+  session.pendingConnectionDeletion = connection.id;
+  session.draggingConnectionId = null;
+  session.connectorLayer?.querySelector(`[data-connection-id="${connection.id}"]`)?.classList.add("awaiting-delete-confirmation");
+  session.toastMessage.textContent = `„${connection.label || "Pfeil"}“ wirklich löschen?`;
+  positionDiagramBuilderConfirmToast(session);
+  session.toast.hidden = false;
+  session.toastDeleteButton.focus({ preventScroll: true });
+}
+
+function enableDiagramBuilderCanvasPan(session, space) {
+  const viewport = session.canvasViewport;
+  const padding = 64;
+  let drag = null, spacePressed = false, suppressClick = false;
+  const finish = (event) => {
+    if (!drag || (event && event.pointerId !== drag.id)) return;
+    const id = drag.id;
+    suppressClick = drag.moved;
+    drag = null;
+    viewport.classList.remove("is-panning");
+    if (viewport.hasPointerCapture(id)) viewport.releasePointerCapture(id);
+  };
+  const editableTarget = target => target.closest?.('input, textarea, select, [contenteditable="true"]');
+  const keyDown = (event) => {
+    if (event.code !== "Space" || editableTarget(event.target)) return;
+    spacePressed = true;
+    viewport.classList.add("pan-ready");
+    event.preventDefault();
+  };
+  const keyUp = (event) => {
+    if (event.code !== "Space") return;
+    spacePressed = false;
+    viewport.classList.remove("pan-ready");
+  };
+  const blur = () => { finish(); spacePressed = false; viewport.classList.remove("pan-ready"); };
+  session.overlay.addEventListener("keydown", keyDown);
+  window.addEventListener("keyup", keyUp);
+  window.addEventListener("blur", blur);
+  viewport.addEventListener("pointerdown", (event) => {
+    if (drag || editableTarget(event.target)) return;
+    suppressClick = false;
+    const empty = [viewport, space, session.surface].includes(event.target);
+    const placing = Number.isInteger(session.armedPieceIndex) || session.pendingConnection;
+    if (event.button !== 1 && !(event.button === 0 && (spacePressed || (empty && !placing)))) return;
+    event.preventDefault(); event.stopPropagation();
+    drag = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+    viewport.setPointerCapture(event.pointerId);
+    viewport.classList.add("is-panning");
+  }, true);
+  viewport.addEventListener("pointermove", (event) => {
+    if (!drag || drag.id !== event.pointerId) return;
+    const dx = drag.x - event.clientX, dy = drag.y - event.clientY;
+    if (!drag.moved && Math.hypot(dx, dy) < 3) return;
+    drag.moved = true;
+    viewport.scrollLeft += dx;
+    viewport.scrollTop += dy;
+    drag.x = event.clientX; drag.y = event.clientY;
+    event.preventDefault(); event.stopPropagation();
+  }, true);
+  ["pointerup", "pointercancel", "lostpointercapture"].forEach(type => viewport.addEventListener(type, finish));
+  viewport.addEventListener("click", (event) => {
+    if (!suppressClick) return;
+    suppressClick = false;
+    event.preventDefault(); event.stopPropagation();
+  }, true);
+  // Only real diagram content grows the grid; navigation has a fixed margin.
+  space.style.padding = `${padding}px`;
+  viewport.scrollLeft = padding;
+  viewport.scrollTop = padding;
+  return () => {
+    blur();
+    window.removeEventListener("keyup", keyUp);
+    window.removeEventListener("blur", blur);
+  };
 }
 
 function openDiagramBuilderMode(file) {
@@ -6623,7 +6904,9 @@ function openDiagramBuilderMode(file) {
   const emptyHint = createElement("div", "diagram-builder-empty");
   emptyHint.append(createElement("strong", "", "Baustein aufnehmen"), createElement("span", "", "Halte oben ein Element und ziehe es in dieses Raster."));
   surface.append(emptyHint);
-  canvasViewport.append(surface);
+  const panSpace = createElement("div", "diagram-builder-pan-space");
+  panSpace.append(surface);
+  canvasViewport.append(panSpace);
   left.append(paletteWrap, canvasViewport);
   const { pane: codePane, viewport: codeViewport, codeList, codeLines } = createDiagramBuilderCodePane(file);
   main.append(codePane, left);
@@ -6693,6 +6976,8 @@ function openDiagramBuilderMode(file) {
     draggingPlacementId: null,
     repositionPreviewCell: null,
     pendingDeletionId: null,
+    pendingConnectionDeletion: null,
+    draggingConnectionId: null,
     pendingContainerDeletion: null,
     editingPlacementId: null,
     finishEditing: null,
@@ -6717,6 +7002,7 @@ function openDiagramBuilderMode(file) {
     handleKeyDown: null
   };
   activeDiagramBuilderSession = session;
+  session.disposeCanvasPan = enableDiagramBuilderCanvasPan(session, panSpace);
   session.resizeObserver = new ResizeObserver(() => drawDiagramBuilderConnections(session));
   session.resizeObserver.observe(surface);
   enableDiagramBuilderPaneZoom(session, canvasViewport, surface, "gridZoom", () => drawDiagramBuilderConnections(session));
